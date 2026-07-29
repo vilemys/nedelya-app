@@ -1,4 +1,4 @@
--- Неделя: автономная многопользовательская модель
+-- Неделька: автономная многопользовательская модель
 create extension if not exists pgcrypto;
 
 create type public.member_role as enum ('owner', 'manager', 'employee');

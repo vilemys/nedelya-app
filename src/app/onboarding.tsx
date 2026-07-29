@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export default function Onboarding({ name }: { name: string }) {
+export default function Onboarding({ name, invitationError = "" }: { name: string; invitationError?: string }) {
   const [organization, setOrganization] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,6 +27,7 @@ export default function Onboarding({ name }: { name: string }) {
         <div className="step">ШАГ 1 ИЗ 1</div>
         <h1>Добро пожаловать{name ? `, ${name}` : ""}!</h1>
         <p>Создайте рабочее пространство. Оно будет пустым — сотрудников и задачи вы добавите самостоятельно.</p>
+        {invitationError && <div className="notice">{invitationError}</div>}
         <form onSubmit={create}>
           <label>Название организации<input autoFocus required minLength={2} value={organization} onChange={(e) => setOrganization(e.target.value)} placeholder="Например, Студия Север" /></label>
           {error && <div className="notice">{error}</div>}

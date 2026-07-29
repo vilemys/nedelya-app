@@ -1,0 +1,22 @@
+.app-shell{display:block}
+.topbar{min-height:76px;position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:26px;padding:12px 30px;background:#f0ede6;border-bottom:1px solid var(--line)}
+.topbar .org-name{margin:0;padding-left:24px;border-left:1px solid #d8d3c8;min-width:150px}
+.topbar nav{display:flex;gap:6px;margin-left:8px}
+.topbar nav button{height:42px;border:0;border-radius:10px;background:transparent;padding:0 14px;cursor:pointer;color:#69665f;white-space:nowrap}
+.topbar nav button.active{background:var(--ink);color:#fff}
+.topbar nav b{margin-left:7px;border-radius:20px;background:rgba(128,128,128,.25);padding:2px 7px}
+.topbar .profile{margin:0 0 0 auto;border:0;padding:0;display:grid;grid-template-columns:36px auto auto;gap:9px;align-items:center}
+.topbar .profile button{grid-column:auto;padding:8px;color:#a6533d}
+.workspace{margin-left:0}
+.content{padding-top:58px}
+.invite-form{display:grid;grid-template-columns:1fr 190px auto;gap:10px;align-items:end;margin:28px 0 14px;padding:18px;background:#fff;border:1px solid var(--line);border-radius:13px}
+.invite-form label{font-size:10px;font-weight:700}
+.invite-form input,.invite-form select{width:100%;height:43px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 12px;margin-top:7px}
+.invite-form .primary{height:43px}
+.pending-list{margin:22px 0 28px}
+.pending-list article{display:flex;align-items:center;justify-content:space-between;gap:15px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin-top:7px}
+.pending-list strong,.pending-list small{display:block}
+.pending-list strong{font-size:11px}
+.pending-list small{font-size:9px;color:var(--muted);margin-top:4px}
+.pending-list button{border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px 10px;font-size:9px;cursor:pointer}
+@media(max-width:760px){.topbar{min-height:112px;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:8px}.topbar .org-name{display:none}.topbar nav{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:1fr 1fr;margin:0}.topbar nav button{text-align:center;height:38px}.topbar .profile{grid-template-columns:32px auto}.topbar .profile>span{width:32px;height:32px}.topbar .profile button,.topbar .profile div{display:none}.workspace{margin:0}.content{padding-top:34px}.invite-form{grid-template-columns:1fr}.invite-form .primary{width:100%}}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export default function AuthForm() {
+export default function AuthForm({ invite = "" }: { invite?: string }) {
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,16 +22,16 @@ export default function AuthForm() {
         password,
         options: {
           data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`,
         },
       });
       if (error) setMessage(error.message);
-      else if (data.session) window.location.href = "/";
+      else if (data.session) window.location.href = invite ? `/?invite=${encodeURIComponent(invite)}` : "/";
       else setMessage("Проверьте почту и подтвердите регистрацию.");
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setMessage("Не удалось войти. Проверьте почту и пароль.");
-      else window.location.href = "/";
+      else window.location.href = invite ? `/?invite=${encodeURIComponent(invite)}` : "/";
     }
     setLoading(false);
   }
@@ -42,9 +42,9 @@ export default function AuthForm() {
         <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setMessage(""); }}>Регистрация</button>
         <button type="button" className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setMessage(""); }}>Войти</button>
       </div>
-      <p className="eyebrow">{mode === "signup" ? "НАЧНЁМ С НУЛЯ" : "С ВОЗВРАЩЕНИЕМ"}</p>
-      <h2>{mode === "signup" ? "Создайте аккаунт" : "Войдите в Неделю"}</h2>
-      <p className="sub">{mode === "signup" ? "После регистрации вы создадите пустую организацию." : "Ваши задачи и команда уже ждут."}</p>
+      <p className="eyebrow">{invite ? "ПРИГЛАШЕНИЕ В КОМАНДУ" : mode === "signup" ? "НАЧНЁМ С НУЛЯ" : "С ВОЗВРАЩЕНИЕМ"}</p>
+      <h2>{mode === "signup" ? "Создайте аккаунт" : "Войдите в Недельку"}</h2>
+      <p className="sub">{invite ? "Войдите или создайте аккаунт с той почтой, на которую вас пригласили." : mode === "signup" ? "После регистрации вы создадите пустую организацию." : "Ваши задачи и команда уже ждут."}</p>
       {mode === "signup" && <label>Ваше имя<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Анна Крылова" /></label>}
       <label>Рабочая почта<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.ru" /></label>
       <label>Пароль<input required type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Минимум 8 символов" /></label>
