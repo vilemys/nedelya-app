@@ -9,7 +9,12 @@
 .topbar .profile button{grid-column:auto;padding:8px;color:#a6533d}
 .workspace{margin-left:0}
 .content{padding-top:58px}
-.invite-form{display:grid;grid-template-columns:1fr 190px auto;gap:10px;align-items:end;margin:28px 0 14px;padding:18px;background:#fff;border:1px solid var(--line);border-radius:13px}
+.positions-card{display:grid;gap:14px;margin:26px 0 16px;padding:18px;background:#eeebfb;border:1px solid #ded7f5;border-radius:13px}
+.positions-card h2,.positions-card p{margin:0}.positions-card h2{font-family:Arial;font-size:14px}.positions-card p{color:var(--muted);font-size:10px;margin-top:5px}
+.positions-card form{display:grid;grid-template-columns:1fr auto;gap:8px}.positions-card input{height:43px;border:1px solid var(--line);border-radius:9px;padding:0 12px}.positions-card .primary{height:43px}
+.position-chips{display:flex;flex-wrap:wrap;gap:7px}.position-chips span{padding:7px 10px;border-radius:20px;background:#fff;color:#5d49ad;font-size:10px}
+.form-error,.form-success{font-size:10px}.form-error{color:#a94f36}.form-success{color:#44775a}
+.invite-form{display:grid;grid-template-columns:minmax(190px,1fr) 150px 180px auto;gap:10px;align-items:end;margin:16px 0 14px;padding:18px;background:#fff;border:1px solid var(--line);border-radius:13px}
 .invite-form label{font-size:10px;font-weight:700}
 .invite-form input,.invite-form select{width:100%;height:43px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 12px;margin-top:7px}
 .invite-form .primary{height:43px}
@@ -19,4 +24,6 @@
 .pending-list strong{font-size:11px}
 .pending-list small{font-size:9px;color:var(--muted);margin-top:4px}
 .pending-list button{border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px 10px;font-size:9px;cursor:pointer}
-@media(max-width:760px){.topbar{min-height:112px;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:8px}.topbar .org-name{display:none}.topbar nav{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:1fr 1fr;margin:0}.topbar nav button{text-align:center;height:38px}.topbar .profile{grid-template-columns:32px auto}.topbar .profile>span{width:32px;height:32px}.topbar .profile button,.topbar .profile div{display:none}.workspace{margin:0}.content{padding-top:34px}.invite-form{grid-template-columns:1fr}.invite-form .primary{width:100%}}
+.member-list article{grid-template-columns:38px 1fr minmax(170px,220px)}
+.member-position{font-size:8px;color:var(--muted)}.member-position select{display:block;width:100%;height:36px;margin-top:4px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:0 9px;font-size:10px}
+@media(max-width:760px){.topbar{min-height:112px;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:8px}.topbar .org-name{display:none}.topbar nav{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:1fr 1fr;margin:0}.topbar nav button{text-align:center;height:38px}.topbar .profile{grid-template-columns:32px auto}.topbar .profile>span{width:32px;height:32px}.topbar .profile button,.topbar .profile div{display:none}.workspace{margin:0}.content{padding-top:34px}.positions-card form,.invite-form{grid-template-columns:1fr}.invite-form .primary{width:100%}.member-list article{grid-template-columns:38px 1fr}.member-position{grid-column:2}}
