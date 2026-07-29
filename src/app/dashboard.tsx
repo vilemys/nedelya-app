@@ -3,19 +3,20 @@
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type Task = { id: string; owner_id: string; title: string; status: string; priority: string; due_date: string | null };
+type Task = { id: string; owner_id: string; title: string; status: string; priority: string; due_date: string | null; created_at?: string; completed_at?: string | null };
 type Member = { user_id: string; role: string; job_title: string | null; position_id: string | null; profiles: { full_name?: string; email?: string } | { full_name?: string; email?: string }[] | null };
 type Invitation = { id: string; email: string; role: string; position_id: string | null; token: string; expires_at: string; accepted_at: string | null };
 type Position = { id: string; name: string };
+type Responsibility = { id: string; assignee_id: string; title: string; expected_result: string; is_active: boolean };
 
 export default function Dashboard(props: {
   userId: string; name: string; email: string; organizationId: string; organizationName: string;
   role: "owner" | "manager" | "employee"; initialTasks: Task[]; members: Member[];
-  initialInvitations: Invitation[]; initialPositions: Position[];
+  initialInvitations: Invitation[]; initialPositions: Position[]; initialResponsibilities: Responsibility[];
 }) {
   const [tasks, setTasks] = useState(props.initialTasks);
   const [title, setTitle] = useState("");
-  const [tab, setTab] = useState<"tasks" | "team">("tasks");
+  const [tab, setTab] = useState<"tasks" | "stats" | "duties" | "team">("tasks");
   const [busy, setBusy] = useState(false);
   const [invitations, setInvitations] = useState(props.initialInvitations);
   const [members, setMembers] = useState(props.members);
@@ -25,10 +26,36 @@ export default function Dashboard(props: {
   const [invitePositionId, setInvitePositionId] = useState("");
   const [newPosition, setNewPosition] = useState("");
   const [positionMessage, setPositionMessage] = useState("");
+  const [responsibilities, setResponsibilities] = useState(props.initialResponsibilities);
+  const [responsibilityAssignee, setResponsibilityAssignee] = useState(props.members[0]?.user_id || "");
+  const [responsibilityTitle, setResponsibilityTitle] = useState("");
+  const [responsibilityResult, setResponsibilityResult] = useState("");
+  const [responsibilityMessage, setResponsibilityMessage] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
   const ownTasks = useMemo(() => tasks.filter((task) => task.owner_id === props.userId), [tasks, props.userId]);
   const canManage = props.role === "owner" || props.role === "manager";
+  const visibleResponsibilities = canManage
+    ? responsibilities
+    : responsibilities.filter((item) => item.assignee_id === props.userId);
+
+  function memberProfile(member?: Member) {
+    if (!member) return null;
+    return Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+  }
+
+  function memberName(userId: string) {
+    const profile = memberProfile(members.find((member) => member.user_id === userId));
+    return profile?.full_name || profile?.email || "Сотрудник";
+  }
+
+  function taskStats(userId: string) {
+    const items = tasks.filter((task) => task.owner_id === userId);
+    const done = items.filter((task) => task.status === "done").length;
+    const active = items.length - done;
+    const overdue = items.filter((task) => task.status !== "done" && task.due_date && new Date(`${task.due_date}T23:59:59`) < new Date()).length;
+    return { total: items.length, done, active, overdue, percent: items.length ? Math.round(done / items.length * 100) : 0 };
+  }
 
   async function addTask(event: React.FormEvent) {
     event.preventDefault();
@@ -121,6 +148,33 @@ export default function Dashboard(props: {
     }
   }
 
+  async function addResponsibility(event: React.FormEvent) {
+    event.preventDefault();
+    if (!responsibilityAssignee || !responsibilityTitle.trim()) return;
+    setResponsibilityMessage("");
+    const supabase = createClient();
+    const { data, error } = await supabase.from("responsibilities").insert({
+      organization_id: props.organizationId,
+      assignee_id: responsibilityAssignee,
+      title: responsibilityTitle.trim(),
+      expected_result: responsibilityResult.trim(),
+      created_by: props.userId,
+    }).select("id,assignee_id,title,expected_result,is_active").single();
+    if (error || !data) {
+      setResponsibilityMessage("Не удалось сохранить обязанность.");
+      return;
+    }
+    setResponsibilities((items) => [...items, data]);
+    setResponsibilityTitle("");
+    setResponsibilityResult("");
+    setResponsibilityMessage("Обязанность добавлена.");
+  }
+
+  async function removeResponsibility(id: string) {
+    const { error } = await createClient().from("responsibilities").update({ is_active: false }).eq("id", id);
+    if (!error) setResponsibilities((items) => items.filter((item) => item.id !== id));
+  }
+
   async function copyInvitation(token: string) {
     await navigator.clipboard.writeText(invitationLink(token));
     setInviteMessage("Ссылка скопирована.");
@@ -136,6 +190,8 @@ export default function Dashboard(props: {
         <div className="org-name"><small>ОРГАНИЗАЦИЯ</small><strong>{props.organizationName}</strong></div>
         <nav>
           <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>✓ Мои задачи <b>{ownTasks.filter((task) => task.status !== "done").length}</b></button>
+          <button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>▥ Статистика</button>
+          <button className={tab === "duties" ? "active" : ""} onClick={() => setTab("duties")}>☷ Обязанности</button>
           {canManage && <button className={tab === "team" ? "active" : ""} onClick={() => setTab("team")}>◎ Команда <b>{members.length}</b></button>}
         </nav>
         <div className="profile">
@@ -165,6 +221,58 @@ export default function Dashboard(props: {
                 </article>
               ))}
               {!ownTasks.length && <div className="empty"><b>Пока нет задач</b><p>Добавьте первую задачу — пространство создано специально для вас.</p></div>}
+            </div>
+          </div>
+        ) : tab === "stats" ? (
+          <div className="content">
+            <p className="eyebrow">{canManage ? "КАРТИНА ПО КОМАНДЕ" : "МОИ РЕЗУЛЬТАТЫ"}</p>
+            <h1>Статистика</h1>
+            <p className="lead">{canManage ? "Понятная сводка по задачам каждого сотрудника." : "Ваш прогресс без сложных отчётов и лишних показателей."}</p>
+            <div className="stat-summary">
+              {(() => {
+                const stats = taskStats(props.userId);
+                return <>
+                  <article><small>ВСЕГО ЗАДАЧ</small><strong>{stats.total}</strong></article>
+                  <article><small>ВЫПОЛНЕНО</small><strong>{stats.done}</strong></article>
+                  <article><small>В РАБОТЕ</small><strong>{stats.active}</strong></article>
+                  <article className={stats.overdue ? "warning" : ""}><small>ПРОСРОЧЕНО</small><strong>{stats.overdue}</strong></article>
+                  <article className="accent"><small>ГОТОВО</small><strong>{stats.percent}%</strong></article>
+                </>;
+              })()}
+            </div>
+            {canManage && <>
+              <div className="list-heading"><h2>Команда</h2><span>{members.length}</span></div>
+              <div className="team-stats">
+                {members.map((member) => {
+                  const stats = taskStats(member.user_id);
+                  return <article key={member.user_id}>
+                    <div><strong>{memberName(member.user_id)}</strong><small>{member.job_title || (member.role === "owner" ? "Владелец" : member.role === "manager" ? "Руководитель" : "Сотрудник")}</small></div>
+                    <span>{stats.done} из {stats.total}</span>
+                    <div className="progress"><i style={{ width: `${stats.percent}%` }} /></div>
+                    <b>{stats.percent}%</b>
+                  </article>;
+                })}
+              </div>
+            </>}
+          </div>
+        ) : tab === "duties" ? (
+          <div className="content">
+            <p className="eyebrow">РОЛИ И ОЖИДАНИЯ</p>
+            <h1>Обязанности</h1>
+            <p className="lead">{canManage ? "Зафиксируйте, за что отвечает каждый сотрудник и какой результат от него ожидается." : "Здесь всегда видно, за что вы отвечаете и какого результата от вас ждут."}</p>
+            {canManage && <form className="responsibility-form" onSubmit={addResponsibility}>
+              <label>Сотрудник<select value={responsibilityAssignee} onChange={(event) => setResponsibilityAssignee(event.target.value)}>{members.map((member) => <option key={member.user_id} value={member.user_id}>{memberName(member.user_id)}</option>)}</select></label>
+              <label>Обязанность<input required value={responsibilityTitle} onChange={(event) => setResponsibilityTitle(event.target.value)} placeholder="Например, отвечать на заявки клиентов" /></label>
+              <label>Ожидаемый результат<textarea value={responsibilityResult} onChange={(event) => setResponsibilityResult(event.target.value)} placeholder="Например, ответ в течение 15 минут" /></label>
+              <button className="primary">＋ Добавить обязанность</button>
+              {responsibilityMessage && <small className={responsibilityMessage.startsWith("Не удалось") ? "form-error" : "form-success"}>{responsibilityMessage}</small>}
+            </form>}
+            <div className="responsibility-list">
+              {visibleResponsibilities.map((item) => <article key={item.id}>
+                <div><small>{memberName(item.assignee_id)}</small><strong>{item.title}</strong>{item.expected_result && <p><b>Результат:</b> {item.expected_result}</p>}</div>
+                {canManage && <button onClick={() => removeResponsibility(item.id)}>Убрать</button>}
+              </article>)}
+              {!visibleResponsibilities.length && <div className="empty"><b>Обязанности ещё не добавлены</b><p>{canManage ? "Добавьте первую обязанность сотрудника." : "Руководитель пока не заполнил этот раздел."}</p></div>}
             </div>
           </div>
         ) : (
