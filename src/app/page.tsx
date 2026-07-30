@@ -36,10 +36,10 @@ export default async function HomePage({
     return <Onboarding name={profile?.full_name || user.user_metadata?.full_name || ""} invitationError={invitationError} />;
   }
 
-  const [{ data: tasks }, { data: members }, { data: invitations }, { data: positions }, { data: responsibilities }] = await Promise.all([
+  const [{ data: tasks }, { data: members }, { data: invitations }, { data: positions }, { data: responsibilities }, { data: metrics }] = await Promise.all([
     supabase.from("tasks").select("*").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }),
     supabase.from("organization_members")
-      .select("user_id,role,job_title,position_id,is_notification_contact,profiles(full_name,email,employee_description,birth_date)")
+      .select("user_id,role,job_title,position_id,is_notification_contact,work_start_time,profiles(full_name,email,employee_description,birth_date)")
       .eq("organization_id", membership.organization_id),
     supabase.from("invitations")
       .select("id,email,role,position_id,token,expires_at,accepted_at")
@@ -52,6 +52,11 @@ export default async function HomePage({
       .order("name"),
     supabase.from("responsibilities")
       .select("id,assignee_id,title,expected_result,is_active")
+      .eq("organization_id", membership.organization_id)
+      .eq("is_active", true)
+      .order("created_at"),
+    supabase.from("kpi_metrics")
+      .select("id,assignee_id,name,description,unit,target_value,current_value,period,is_active")
       .eq("organization_id", membership.organization_id)
       .eq("is_active", true)
       .order("created_at"),
@@ -74,6 +79,7 @@ export default async function HomePage({
       initialInvitations={invitations || []}
       initialPositions={positions || []}
       initialResponsibilities={responsibilities || []}
+      initialMetrics={metrics || []}
     />
   );
 }

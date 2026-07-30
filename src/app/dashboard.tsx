@@ -5,19 +5,20 @@ import { createClient } from "@/lib/supabase/client";
 
 type Task = { id: string; owner_id: string; title: string; status: string; priority: string; due_date: string | null; created_at?: string; completed_at?: string | null };
 type MemberProfile = { full_name?: string; email?: string; employee_description?: string; birth_date?: string | null };
-type Member = { user_id: string; role: string; job_title: string | null; position_id: string | null; is_notification_contact: boolean; profiles: MemberProfile | MemberProfile[] | null };
+type Member = { user_id: string; role: string; job_title: string | null; position_id: string | null; is_notification_contact: boolean; work_start_time: string | null; profiles: MemberProfile | MemberProfile[] | null };
 type Invitation = { id: string; email: string; role: string; position_id: string | null; token: string; expires_at: string; accepted_at: string | null };
 type Position = { id: string; name: string; parent_position_id: string | null; purpose: string };
 type Responsibility = { id: string; assignee_id: string; title: string; expected_result: string; is_active: boolean };
+type KpiMetric = { id: string; assignee_id: string | null; name: string; description: string; unit: string; target_value: number; current_value: number; period: "week" | "month" | "quarter"; is_active: boolean };
 
 export default function Dashboard(props: {
   userId: string; name: string; email: string; organizationId: string; organizationName: string;
   role: "owner" | "manager" | "employee"; initialTasks: Task[]; members: Member[];
-  initialInvitations: Invitation[]; initialPositions: Position[]; initialResponsibilities: Responsibility[];
+  initialInvitations: Invitation[]; initialPositions: Position[]; initialResponsibilities: Responsibility[]; initialMetrics: KpiMetric[];
 }) {
   const [tasks, setTasks] = useState(props.initialTasks);
   const [title, setTitle] = useState("");
-  const [tab, setTab] = useState<"tasks" | "stats" | "duties" | "structure" | "team">("tasks");
+  const [tab, setTab] = useState<"tasks" | "stats" | "duties" | "structure" | "kpi" | "team">("tasks");
   const [busy, setBusy] = useState(false);
   const [invitations, setInvitations] = useState(props.initialInvitations);
   const [members, setMembers] = useState(props.members);
@@ -35,6 +36,13 @@ export default function Dashboard(props: {
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
+  const [metrics, setMetrics] = useState(props.initialMetrics);
+  const [metricName, setMetricName] = useState("");
+  const [metricAssignee, setMetricAssignee] = useState(props.members[0]?.user_id || "");
+  const [metricUnit, setMetricUnit] = useState("");
+  const [metricTarget, setMetricTarget] = useState("");
+  const [metricPeriod, setMetricPeriod] = useState<"week" | "month" | "quarter">("month");
+  const [metricMessage, setMetricMessage] = useState("");
   const ownTasks = useMemo(() => tasks.filter((task) => task.owner_id === props.userId), [tasks, props.userId]);
   const canManage = props.role === "owner" || props.role === "manager";
   const visibleResponsibilities = canManage
@@ -59,15 +67,26 @@ export default function Dashboard(props: {
     }));
   }
 
+  function updateMemberWorkTime(userId: string, workStartTime: string) {
+    setMembers((items) => items.map((member) => member.user_id === userId
+      ? { ...member, work_start_time: workStartTime || null }
+      : member));
+  }
+
   async function saveMemberProfile(userId: string) {
     const profile = memberProfile(members.find((member) => member.user_id === userId));
     if (!profile) return;
     setProfileMessage("");
-    const { error } = await createClient().from("profiles").update({
+    const supabase = createClient();
+    const { error } = await supabase.from("profiles").update({
       employee_description: profile.employee_description?.trim() || "",
       birth_date: profile.birth_date || null,
     }).eq("id", userId);
-    setProfileMessage(error ? "Не удалось сохранить карточку сотрудника." : `Карточка «${memberName(userId)}» сохранена.`);
+    const member = members.find((item) => item.user_id === userId);
+    const { error: membershipError } = await supabase.from("organization_members").update({
+      work_start_time: member?.work_start_time || null,
+    }).eq("organization_id", props.organizationId).eq("user_id", userId);
+    setProfileMessage(error || membershipError ? "Не удалось сохранить карточку сотрудника." : `Карточка «${memberName(userId)}» сохранена.`);
   }
 
   async function setNotificationContact(userId: string) {
@@ -209,11 +228,93 @@ export default function Dashboard(props: {
     setPositions((items) => items.map((position) => position.id === positionId ? { ...position, purpose } : position));
   }
 
+  function changePositionName(positionId: string, name: string) {
+    setPositions((items) => items.map((position) => position.id === positionId ? { ...position, name } : position));
+  }
+
   async function savePositionPurpose(positionId: string) {
     const position = positions.find((item) => item.id === positionId);
     if (!position) return;
-    const { error } = await createClient().from("positions").update({ purpose: position.purpose.trim() }).eq("id", positionId);
-    setPositionMessage(error ? "Не удалось сохранить цель должности." : `Должность «${position.name}» обновлена.`);
+    const supabase = createClient();
+    const { error } = await supabase.from("positions").update({
+      name: position.name.trim(), purpose: position.purpose.trim(),
+    }).eq("id", positionId);
+    if (!error) {
+      await supabase.from("organization_members").update({ job_title: position.name.trim() })
+        .eq("organization_id", props.organizationId).eq("position_id", positionId);
+      setMembers((items) => items.map((member) => member.position_id === positionId ? { ...member, job_title: position.name.trim() } : member));
+    }
+    setPositionMessage(error ? "Не удалось сохранить должность." : `Должность «${position.name}» обновлена.`);
+  }
+
+  async function removePosition(positionId: string) {
+    const position = positions.find((item) => item.id === positionId);
+    if (!position || !window.confirm(`Удалить должность «${position.name}»?`)) return;
+    const { error } = await createClient().from("positions").delete().eq("id", positionId);
+    if (error) {
+      setPositionMessage("Нельзя удалить должность, пока к ней привязаны сотрудники или приглашения.");
+      return;
+    }
+    setPositions((items) => items.filter((item) => item.id !== positionId).map((item) => item.parent_position_id === positionId ? { ...item, parent_position_id: null } : item));
+    setPositionMessage("Должность удалена.");
+  }
+
+  async function installStructureTemplate() {
+    setPositionMessage("");
+    const supabase = createClient();
+    const { error } = await supabase.rpc("install_default_org_structure");
+    if (error) {
+      setPositionMessage("Не удалось установить шаблон структуры.");
+      return;
+    }
+    const { data } = await supabase.from("positions").select("id,name,parent_position_id,purpose")
+      .eq("organization_id", props.organizationId).order("name");
+    if (data) setPositions(data);
+    setPositionMessage("Готовая «Структура Организации» добавлена.");
+  }
+
+  async function removeMember(userId: string) {
+    const name = memberName(userId);
+    if (!window.confirm(`Удалить сотрудника «${name}» из компании? Его аккаунт и история задач сохранятся.`)) return;
+    const { error } = await createClient().rpc("remove_organization_member", { target_user_id: userId });
+    if (error) {
+      setProfileMessage("Не удалось удалить сотрудника. Владельца компании удалить нельзя.");
+      return;
+    }
+    setMembers((items) => items.filter((item) => item.user_id !== userId));
+    setProfileMessage(`Сотрудник «${name}» удалён из компании.`);
+  }
+
+  async function addMetric(event: React.FormEvent) {
+    event.preventDefault();
+    if (!metricName.trim() || !metricTarget) return;
+    setMetricMessage("");
+    const { data, error } = await createClient().from("kpi_metrics").insert({
+      organization_id: props.organizationId,
+      assignee_id: metricAssignee || null,
+      name: metricName.trim(),
+      unit: metricUnit.trim(),
+      target_value: Number(metricTarget),
+      period: metricPeriod,
+      created_by: props.userId,
+    }).select("id,assignee_id,name,description,unit,target_value,current_value,period,is_active").single();
+    if (error || !data) {
+      setMetricMessage("Не удалось создать KPI.");
+      return;
+    }
+    setMetrics((items) => [data as KpiMetric, ...items]);
+    setMetricName(""); setMetricUnit(""); setMetricTarget("");
+    setMetricMessage("Метрика KPI создана.");
+  }
+
+  async function updateMetricValue(id: string, value: number) {
+    const { error } = await createClient().from("kpi_metrics").update({ current_value: value }).eq("id", id);
+    if (!error) setMetrics((items) => items.map((item) => item.id === id ? { ...item, current_value: value } : item));
+  }
+
+  async function removeMetric(id: string) {
+    const { error } = await createClient().from("kpi_metrics").update({ is_active: false }).eq("id", id);
+    if (!error) setMetrics((items) => items.filter((item) => item.id !== id));
   }
 
   async function addResponsibility(event: React.FormEvent) {
@@ -278,7 +379,8 @@ export default function Dashboard(props: {
           <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>✓ Мои задачи <b>{ownTasks.filter((task) => task.status !== "done").length}</b></button>
           <button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>▥ Статистика</button>
           <button className={tab === "duties" ? "active" : ""} onClick={() => setTab("duties")}>☷ Обязанности</button>
-          <button className={tab === "structure" ? "active" : ""} onClick={() => setTab("structure")}>⌘ Оргструктура</button>
+          <button className={tab === "structure" ? "active" : ""} onClick={() => setTab("structure")}>⌘ Структура</button>
+          <button className={tab === "kpi" ? "active" : ""} onClick={() => setTab("kpi")}>↗ KPI</button>
           {canManage && <button className={tab === "team" ? "active" : ""} onClick={() => setTab("team")}>◎ Команда <b>{members.length}</b></button>}
         </nav>
         <div className="profile">
@@ -371,18 +473,18 @@ export default function Dashboard(props: {
         ) : tab === "structure" ? (
           <div className="content structure-content">
             <p className="eyebrow">КТО ЗА ЧТО ОТВЕЧАЕТ</p>
-            <h1>Оргструктура</h1>
+            <h1>Структура Организации</h1>
             <p className="lead">Большое дерево компании: должности, подчинённость, цели и сотрудники на каждом месте.</p>
             {canManage && <section className="structure-editor">
-              <div><h2>Настройка дерева</h2><p>Выберите для каждой должности руководящую должность и кратко опишите её главную цель.</p></div>
+              <div className="structure-editor-head"><div><h2>Настройка дерева</h2><p>Выберите для каждой должности руководящую должность и кратко опишите её главную цель.</p></div><button className="template-button" onClick={installStructureTemplate}>＋ Добавить готовую структуру</button></div>
               {positions.map((position) => <article key={position.id}>
-                <strong>{position.name}</strong>
+                <label>Название должности<input value={position.name} onChange={(event) => changePositionName(position.id, event.target.value)} /></label>
                 <label>Подчиняется<select value={position.parent_position_id || ""} onChange={(event) => changePositionParent(position.id, event.target.value)}>
                   <option value="">Верхний уровень</option>
                   {positions.filter((item) => item.id !== position.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select></label>
                 <label>Цель должности<input value={position.purpose} onChange={(event) => changePositionPurpose(position.id, event.target.value)} placeholder="Какой главный результат даёт эта должность?" /></label>
-                <button onClick={() => savePositionPurpose(position.id)}>Сохранить</button>
+                <div className="position-buttons"><button onClick={() => savePositionPurpose(position.id)}>Сохранить</button><button className="danger-button" onClick={() => removePosition(position.id)}>Удалить</button></div>
               </article>)}
               {positionMessage && <small className={positionMessage.startsWith("Не удалось") ? "form-error" : "form-success"}>{positionMessage}</small>}
             </section>}
@@ -391,6 +493,33 @@ export default function Dashboard(props: {
                 {rootPositions.map((position) => renderPositionNode(position))}
                 {!positions.length && <div className="empty"><b>Дерево пока пустое</b><p>Руководитель может добавить должности в разделе «Команда».</p></div>}
               </div>
+            </div>
+          </div>
+        ) : tab === "kpi" ? (
+          <div className="content">
+            <p className="eyebrow">ИЗМЕРИМЫЕ РЕЗУЛЬТАТЫ</p>
+            <h1>Метрики KPI</h1>
+            <p className="lead">Создавайте понятные показатели для команды и отслеживайте прогресс к цели.</p>
+            {canManage && <form className="kpi-form" onSubmit={addMetric}>
+              <label>Название KPI<input required value={metricName} onChange={(event) => setMetricName(event.target.value)} placeholder="Например, выручка" /></label>
+              <label>Сотрудник<select value={metricAssignee} onChange={(event) => setMetricAssignee(event.target.value)}><option value="">Вся команда</option>{members.map((member) => <option key={member.user_id} value={member.user_id}>{memberName(member.user_id)}</option>)}</select></label>
+              <label>Цель<input required type="number" step="any" value={metricTarget} onChange={(event) => setMetricTarget(event.target.value)} placeholder="100" /></label>
+              <label>Единица<input value={metricUnit} onChange={(event) => setMetricUnit(event.target.value)} placeholder="₽, %, шт." /></label>
+              <label>Период<select value={metricPeriod} onChange={(event) => setMetricPeriod(event.target.value as "week" | "month" | "quarter")}><option value="week">Неделя</option><option value="month">Месяц</option><option value="quarter">Квартал</option></select></label>
+              <button className="primary">＋ Создать KPI</button>
+              {metricMessage && <small className={metricMessage.startsWith("Не удалось") ? "form-error" : "form-success"}>{metricMessage}</small>}
+            </form>}
+            <div className="kpi-grid">
+              {metrics.map((metric) => {
+                const percent = metric.target_value ? Math.max(0, Math.round(metric.current_value / metric.target_value * 100)) : 0;
+                return <article key={metric.id}>
+                  <div className="kpi-title"><div><small>{metric.assignee_id ? memberName(metric.assignee_id) : "Вся команда"} · {metric.period === "week" ? "Неделя" : metric.period === "quarter" ? "Квартал" : "Месяц"}</small><strong>{metric.name}</strong></div>{canManage && <button onClick={() => removeMetric(metric.id)}>Удалить</button>}</div>
+                  <div className="kpi-values"><b>{metric.current_value} {metric.unit}</b><span>цель {metric.target_value} {metric.unit}</span></div>
+                  <div className="kpi-progress"><i style={{ width: `${Math.min(percent, 100)}%` }} /></div>
+                  <div className="kpi-footer"><strong>{percent}%</strong>{canManage && <label>Текущее значение<input type="number" step="any" value={metric.current_value} onChange={(event) => updateMetricValue(metric.id, Number(event.target.value))} /></label>}</div>
+                </article>;
+              })}
+              {!metrics.length && <div className="empty"><b>KPI пока нет</b><p>Руководитель может создать первую измеримую цель.</p></div>}
             </div>
           </div>
         ) : (
@@ -439,8 +568,9 @@ export default function Dashboard(props: {
                   <label className="member-position">Должность<select value={member.position_id || ""} onChange={(event) => changeMemberPosition(member.user_id, event.target.value)}><option value="">Не выбрана</option>{positions.map((position) => <option key={position.id} value={position.id}>{position.name}</option>)}</select></label>
                   <div className="member-details">
                     <label>Дата рождения<input type="date" value={profile?.birth_date || ""} onChange={(event) => updateMemberProfile(member.user_id, { birth_date: event.target.value || null })} /></label>
+                    <label>Начало рабочего дня<input type="time" value={member.work_start_time?.slice(0, 5) || ""} onChange={(event) => updateMemberWorkTime(member.user_id, event.target.value)} /></label>
                     <label>Описание сотрудника<textarea value={profile?.employee_description || ""} onChange={(event) => updateMemberProfile(member.user_id, { employee_description: event.target.value })} placeholder="Сильные стороны, опыт, важные особенности работы…" /></label>
-                    <button onClick={() => saveMemberProfile(member.user_id)}>Сохранить карточку</button>
+                    <div className="member-buttons"><button onClick={() => saveMemberProfile(member.user_id)}>Сохранить</button>{member.role !== "owner" && <button className="remove-member" onClick={() => removeMember(member.user_id)}>Удалить из компании</button>}</div>
                   </div>
                 </article>;
               })}
