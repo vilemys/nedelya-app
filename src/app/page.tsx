@@ -25,7 +25,7 @@ export default async function HomePage({
   }
 
   const [{ data: profile }, { data: membership }] = await Promise.all([
-    supabase.from("profiles").select("full_name,email").eq("id", user.id).single(),
+    supabase.from("profiles").select("full_name,email,avatar_url,avatar_color").eq("id", user.id).single(),
     supabase.from("organization_members")
       .select("role,job_title,organization_id,organizations(name)")
       .eq("user_id", user.id)
@@ -39,7 +39,7 @@ export default async function HomePage({
   const [{ data: tasks }, { data: members }, { data: invitations }, { data: positions }, { data: responsibilities }, { data: metrics }] = await Promise.all([
     supabase.from("tasks").select("*").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }),
     supabase.from("organization_members")
-      .select("user_id,role,job_title,position_id,is_notification_contact,work_start_time,profiles(full_name,email,employee_description,birth_date)")
+      .select("user_id,role,job_title,position_id,is_notification_contact,work_start_time,profiles(full_name,email,employee_description,birth_date,avatar_url,avatar_color)")
       .eq("organization_id", membership.organization_id),
     supabase.from("invitations")
       .select("id,email,role,position_id,token,expires_at,accepted_at")
@@ -71,6 +71,8 @@ export default async function HomePage({
       userId={user.id}
       name={profile?.full_name || ""}
       email={profile?.email || user.email || ""}
+      avatarUrl={profile?.avatar_url || ""}
+      avatarColor={profile?.avatar_color || "#7655d8"}
       organizationId={membership.organization_id}
       organizationName={(organization as { name?: string } | null)?.name || "Организация"}
       role={membership.role}

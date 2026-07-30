@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Task = { id: string; owner_id: string; title: string; status: string; priority: string; due_date: string | null; created_at?: string; completed_at?: string | null };
-type MemberProfile = { full_name?: string; email?: string; employee_description?: string; birth_date?: string | null };
+type MemberProfile = { full_name?: string; email?: string; employee_description?: string; birth_date?: string | null; avatar_url?: string | null; avatar_color?: string };
 type Member = { user_id: string; role: string; job_title: string | null; position_id: string | null; is_notification_contact: boolean; work_start_time: string | null; profiles: MemberProfile | MemberProfile[] | null };
 type Invitation = { id: string; email: string; role: string; position_id: string | null; token: string; expires_at: string; accepted_at: string | null };
 type Position = { id: string; name: string; parent_position_id: string | null; purpose: string };
@@ -12,7 +12,7 @@ type Responsibility = { id: string; assignee_id: string; title: string; expected
 type KpiMetric = { id: string; assignee_id: string | null; name: string; description: string; unit: string; target_value: number; current_value: number; period: "week" | "month" | "quarter"; is_active: boolean };
 
 export default function Dashboard(props: {
-  userId: string; name: string; email: string; organizationId: string; organizationName: string;
+  userId: string; name: string; email: string; avatarUrl: string; avatarColor: string; organizationId: string; organizationName: string;
   role: "owner" | "manager" | "employee"; initialTasks: Task[]; members: Member[];
   initialInvitations: Invitation[]; initialPositions: Position[]; initialResponsibilities: Responsibility[]; initialMetrics: KpiMetric[];
 }) {
@@ -43,6 +43,11 @@ export default function Dashboard(props: {
   const [metricTarget, setMetricTarget] = useState("");
   const [metricPeriod, setMetricPeriod] = useState<"week" | "month" | "quarter">("month");
   const [metricMessage, setMetricMessage] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(props.avatarUrl);
+  const [avatarColor, setAvatarColor] = useState(props.avatarColor);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState("");
   const ownTasks = useMemo(() => tasks.filter((task) => task.owner_id === props.userId), [tasks, props.userId]);
   const canManage = props.role === "owner" || props.role === "manager";
   const visibleResponsibilities = canManage
@@ -152,6 +157,49 @@ export default function Dashboard(props: {
   async function signOut() {
     await createClient().auth.signOut();
     window.location.href = "/auth";
+  }
+
+  async function saveAvatarColor(color: string) {
+    setAvatarColor(color);
+    setAvatarMessage("");
+    const { error } = await createClient().from("profiles").update({ avatar_color: color }).eq("id", props.userId);
+    setAvatarMessage(error ? "Не удалось сохранить цвет." : "Цвет профиля сохранён.");
+  }
+
+  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+      setAvatarMessage("Выберите изображение размером до 2 МБ.");
+      return;
+    }
+    setAvatarBusy(true);
+    setAvatarMessage("");
+    const supabase = createClient();
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${props.userId}/avatar-${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (uploadError) {
+      setAvatarMessage("Не удалось загрузить фотографию.");
+      setAvatarBusy(false);
+      return;
+    }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const { error } = await supabase.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", props.userId);
+    if (!error) {
+      setAvatarUrl(data.publicUrl);
+      updateMemberProfile(props.userId, { avatar_url: data.publicUrl });
+    }
+    setAvatarMessage(error ? "Не удалось сохранить фотографию." : "Фотография профиля обновлена.");
+    setAvatarBusy(false);
+  }
+
+  function Avatar({ profile, className = "" }: { profile?: MemberProfile | null; className?: string }) {
+    const color = profile?.avatar_color || "#7655d8";
+    const url = profile?.avatar_url;
+    return <span className={`avatar ${className}`} style={{ backgroundColor: color }}>
+      {url ? <img src={url} alt="" /> : (profile?.full_name?.slice(0, 1) || "•")}
+    </span>;
   }
 
   function invitationLink(token: string) {
@@ -350,7 +398,6 @@ export default function Dashboard(props: {
   }
 
   const roleName = props.role === "owner" ? "Владелец" : props.role === "manager" ? "Руководитель" : "Сотрудник";
-  const initials = props.name.split(" ").map((part) => part[0]).slice(0, 2).join("") || "Я";
   const rootPositions = positions.filter((position) => !position.parent_position_id || !positions.some((item) => item.id === position.parent_position_id));
 
   function renderPositionNode(position: Position, path: string[] = []) {
@@ -373,7 +420,7 @@ export default function Dashboard(props: {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">▥</span>Неделька</div>
+        <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span>Неделька</span></div>
         <div className="org-name"><small>ОРГАНИЗАЦИЯ</small><strong>{props.organizationName}</strong></div>
         <nav>
           <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>✓ Мои задачи <b>{ownTasks.filter((task) => task.status !== "done").length}</b></button>
@@ -384,11 +431,34 @@ export default function Dashboard(props: {
           {canManage && <button className={tab === "team" ? "active" : ""} onClick={() => setTab("team")}>◎ Команда <b>{members.length}</b></button>}
         </nav>
         <div className="profile">
-          <span>{initials}</span>
+          <button className="profile-main" onClick={() => setProfileOpen(true)} aria-label="Открыть профиль">
+          <Avatar profile={{ full_name: props.name, avatar_url: avatarUrl, avatar_color: avatarColor }} />
           <div><strong>{props.name || props.email}</strong><small>Профиль · {roleName}</small></div>
+          </button>
           <button onClick={signOut}>Выйти →</button>
         </div>
       </header>
+
+      {profileOpen && <div className="profile-dialog-backdrop" onMouseDown={() => setProfileOpen(false)}>
+        <section className="profile-dialog" onMouseDown={(event) => event.stopPropagation()} aria-modal="true" role="dialog">
+          <button className="profile-close" onClick={() => setProfileOpen(false)} aria-label="Закрыть">×</button>
+          <p className="eyebrow">МОЙ ПРОФИЛЬ</p>
+          <h2>Аватар и цвет</h2>
+          <div className="avatar-preview"><Avatar profile={{ full_name: props.name, avatar_url: avatarUrl, avatar_color: avatarColor }} /></div>
+          <label className="avatar-upload">
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadAvatar} disabled={avatarBusy} />
+            {avatarBusy ? "Загружаем…" : "Выбрать фотографию"}
+          </label>
+          <div className="color-picker">
+            <span>Цвет профиля</span>
+            <div>{["#7655d8", "#a8d957", "#ef8d72", "#56b8a7", "#e4a63d", "#b866c8"].map((color) => (
+              <button key={color} style={{ backgroundColor: color }} className={avatarColor === color ? "selected" : ""} onClick={() => saveAvatarColor(color)} aria-label={`Выбрать цвет ${color}`} />
+            ))}</div>
+          </div>
+          {avatarMessage && <p className="avatar-message">{avatarMessage}</p>}
+          <small>Подойдут JPG, PNG или WebP до 2 МБ.</small>
+        </section>
+      </div>}
 
       <section className="workspace">
         {tab === "tasks" ? (
@@ -563,7 +633,7 @@ export default function Dashboard(props: {
               {members.map((member) => {
                 const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
                 return <article className="member-card" key={member.user_id}>
-                  <span>{profile?.full_name?.slice(0, 1) || "•"}</span>
+                  <Avatar profile={profile} />
                   <div className="member-identity"><strong>{profile?.full_name || profile?.email}</strong><small>{member.role === "owner" ? "Владелец" : member.role === "manager" ? "Руководитель" : "Сотрудник"}{member.job_title ? ` · ${member.job_title}` : ""}{member.is_notification_contact ? " · Ответственный за уведомления" : ""}</small></div>
                   <label className="member-position">Должность<select value={member.position_id || ""} onChange={(event) => changeMemberPosition(member.user_id, event.target.value)}><option value="">Не выбрана</option>{positions.map((position) => <option key={position.id} value={position.id}>{position.name}</option>)}</select></label>
                   <div className="member-details">

@@ -84,3 +84,52 @@ body{font-size:16px;background:#fbfbfd}.content{max-width:1080px}.content h1{fon
 
 @media(max-width:1180px){.kpi-form{grid-template-columns:repeat(3,1fr)}.kpi-form .primary{width:100%}.member-details{grid-template-columns:1fr 1fr}.member-details>label:nth-child(3),.member-buttons{grid-column:1/-1}.member-buttons{flex-direction:row}}
 @media(max-width:760px){.content h1{font-size:38px}.lead{font-size:14px}.structure-editor-head{align-items:stretch;flex-direction:column}.template-button{width:100%}.kpi-form,.kpi-grid{grid-template-columns:1fr}.member-details{grid-template-columns:1fr}.member-details>label:nth-child(3),.member-buttons{grid-column:auto}.member-buttons{flex-direction:column}.task>strong{font-size:13px}}
+
+/* Мягкая светлая палитра и обновлённый профиль */
+:root{--ink:#332657;--paper:#fbf9ff;--muted:#746a8b;--line:#e9e0fa;--violet:#7655d8;--lime:#c9ef72}
+body{background:linear-gradient(150deg,#fffaff 0%,#f8f4ff 48%,#f7fce9 100%);color:var(--ink)}
+.workspace{min-height:calc(100vh - 76px);background:
+  radial-gradient(circle at 6% 8%,rgba(202,239,114,.22),transparent 26%),
+  radial-gradient(circle at 93% 15%,rgba(199,181,255,.24),transparent 31%)}
+.content{max-width:1160px}
+.content h1{font-size:clamp(46px,5vw,64px);line-height:1;letter-spacing:-.055em}
+.lead{font-size:17px;max-width:720px;color:#71658a}
+.eyebrow{font-size:12px;color:#7255c2}
+.list-heading h2{font-size:20px}
+.task{min-height:76px;padding:16px 18px;background:#fffdfd;border-color:#eee6fa}
+.task>strong{font-size:16px}.task>span{font-size:12px;background:#f1ebff;color:#6548b6}
+.empty{background:rgba(255,255,255,.72);border-color:#d9cdf3}.empty b{font-size:16px}.empty p{font-size:13px}
+.quick-add input{min-height:52px;font-size:15px;border-color:#e3d9f5;background:#fffefd}.quick-add .primary{min-height:52px}
+.topbar{background:rgba(251,248,255,.92);backdrop-filter:blur(18px);border-color:#e9def9}
+.topbar nav button{color:#675b7f}.topbar nav button.active{background:#7655d8}
+.topbar nav button:hover{background:#eee7ff}
+
+/* Знак Недельки: три ритма недели в лаконичной форме */
+.brand{gap:12px;font-size:22px;letter-spacing:-.035em}
+.brand-mark{display:flex;align-items:flex-end;justify-content:center;gap:3px;width:38px;height:38px;padding:9px;border-radius:12px;background:#c9ef72;box-shadow:0 8px 22px rgba(147,190,59,.25)}
+.brand-mark i{display:block;width:4px;border-radius:4px;background:#5d3db7}.brand-mark i:nth-child(1){height:10px}.brand-mark i:nth-child(2){height:19px}.brand-mark i:nth-child(3){height:14px}
+
+.topbar .profile{min-width:275px;display:flex;grid-template-columns:none;gap:8px;padding:7px;background:#fffafd;border-color:#e4d9f8}
+.profile-main{display:flex!important;align-items:center;gap:11px;flex:1;min-width:0;padding:0!important;border:0!important;background:transparent!important;color:var(--ink)!important;text-align:left!important;cursor:pointer}
+.profile-main div{min-width:0}.profile-main strong{font-size:14px!important}.profile-main small{font-size:11px!important}
+.avatar{flex:0 0 auto;width:46px;height:46px;display:grid;place-items:center;overflow:hidden;border-radius:14px;color:#fff;font-size:15px;font-weight:800;box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.member-card>.avatar{width:46px;height:46px}
+
+.profile-dialog-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:rgba(58,39,98,.22);backdrop-filter:blur(8px)}
+.profile-dialog{position:relative;width:min(440px,100%);padding:34px;border:1px solid #e5d9f7;border-radius:26px;background:#fffafd;box-shadow:0 30px 80px rgba(83,56,139,.2)}
+.profile-dialog h2{margin:7px 0 24px;font-size:30px}.profile-close{position:absolute;top:16px;right:17px;width:34px;height:34px;border:0;border-radius:50%;background:#efe8ff;color:#6b4bc4;font-size:24px;cursor:pointer}
+.avatar-preview{display:grid;place-items:center;margin:8px 0 20px}.avatar-preview .avatar{width:104px;height:104px;border-radius:31px;font-size:34px;box-shadow:0 15px 35px rgba(82,54,144,.18)}
+.avatar-upload{display:block;padding:13px 16px;border-radius:12px;background:#7655d8;color:#fff;font-size:14px;font-weight:750;text-align:center;cursor:pointer}.avatar-upload input{display:none}
+.color-picker{margin-top:22px}.color-picker>span{font-size:13px;font-weight:750}.color-picker>div{display:flex;gap:11px;margin-top:12px}.color-picker button{width:34px;height:34px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #dfd3f2;cursor:pointer}.color-picker button.selected{box-shadow:0 0 0 3px #7655d8}
+.avatar-message{margin:17px 0 0;color:#6548b6;font-size:13px}.profile-dialog>small{display:block;margin-top:15px;color:#877c9e;font-size:11px}
+
+.positions-card,.structure-editor,.notification-contact-card,.kpi-form,.birthday-notifications{background:linear-gradient(125deg,#f3edff,#f8fddd);border-color:#e4daf6}
+.stat-summary article,.kpi-grid>article,.member-list article.member-card,.responsibility-list article,.team-stats article,.invite-form{background:#fffdfd;border-color:#eee5fa}
+
+@media(max-width:760px){
+  .workspace{min-height:calc(100vh - 130px)}.content h1{font-size:42px}.lead{font-size:16px}
+  .brand{font-size:19px}.brand-mark{width:36px!important;height:36px!important}
+  .topbar .profile{width:auto;min-width:0}.profile-main div{display:none!important}.profile-main{flex:0!important}.topbar .profile>button:last-child{font-size:11px}
+  .profile-dialog{padding:28px 22px}.color-picker>div{gap:8px;flex-wrap:wrap}
+}
