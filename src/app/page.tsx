@@ -39,7 +39,7 @@ export default async function HomePage({
   const [{ data: tasks }, { data: members }, { data: invitations }, { data: positions }, { data: responsibilities }] = await Promise.all([
     supabase.from("tasks").select("*").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }),
     supabase.from("organization_members")
-      .select("user_id,role,job_title,position_id,profiles(full_name,email)")
+      .select("user_id,role,job_title,position_id,is_notification_contact,profiles(full_name,email,employee_description,birth_date)")
       .eq("organization_id", membership.organization_id),
     supabase.from("invitations")
       .select("id,email,role,position_id,token,expires_at,accepted_at")
@@ -47,7 +47,7 @@ export default async function HomePage({
       .is("accepted_at", null)
       .order("created_at", { ascending: false }),
     supabase.from("positions")
-      .select("id,name")
+      .select("id,name,parent_position_id,purpose")
       .eq("organization_id", membership.organization_id)
       .order("name"),
     supabase.from("responsibilities")
