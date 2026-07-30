@@ -9,7 +9,7 @@ export default async function AuthPage({
   return (
     <main className="auth-shell">
       <section className="auth-story">
-        <div className="brand"><span className="brand-mark">▥</span>Неделька</div>
+        <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span>Неделька</span></div>
         <div>
           <span className="kicker">РАБОТА В СВОЁМ РИТМЕ</span>
           <h1>Задачи видны.<br />Команда спокойна.</h1>
