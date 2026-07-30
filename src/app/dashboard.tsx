@@ -10,15 +10,16 @@ type Invitation = { id: string; email: string; role: string; position_id: string
 type Position = { id: string; name: string; parent_position_id: string | null; purpose: string };
 type Responsibility = { id: string; assignee_id: string; title: string; expected_result: string; is_active: boolean };
 type KpiMetric = { id: string; assignee_id: string | null; name: string; description: string; unit: string; target_value: number; current_value: number; period: "week" | "month" | "quarter"; is_active: boolean };
+type PersonalDatabase = { id: string; name: string; columns: string[]; records: Record<string, string>[]; created_at: string };
 
 export default function Dashboard(props: {
   userId: string; name: string; email: string; avatarUrl: string; avatarColor: string; organizationId: string; organizationName: string;
   role: "owner" | "manager" | "employee"; initialTasks: Task[]; members: Member[];
-  initialInvitations: Invitation[]; initialPositions: Position[]; initialResponsibilities: Responsibility[]; initialMetrics: KpiMetric[];
+  initialInvitations: Invitation[]; initialPositions: Position[]; initialResponsibilities: Responsibility[]; initialMetrics: KpiMetric[]; initialDatabases: PersonalDatabase[];
 }) {
   const [tasks, setTasks] = useState(props.initialTasks);
   const [title, setTitle] = useState("");
-  const [tab, setTab] = useState<"tasks" | "stats" | "duties" | "structure" | "kpi" | "team">("tasks");
+  const [tab, setTab] = useState<"tasks" | "stats" | "duties" | "structure" | "kpi" | "database" | "team">("tasks");
   const [busy, setBusy] = useState(false);
   const [invitations, setInvitations] = useState(props.initialInvitations);
   const [members, setMembers] = useState(props.members);
@@ -48,6 +49,11 @@ export default function Dashboard(props: {
   const [avatarColor, setAvatarColor] = useState(props.avatarColor);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarMessage, setAvatarMessage] = useState("");
+  const [databases, setDatabases] = useState(props.initialDatabases);
+  const [databaseName, setDatabaseName] = useState("");
+  const [databaseColumns, setDatabaseColumns] = useState("");
+  const [databaseMessage, setDatabaseMessage] = useState("");
+  const [recordDrafts, setRecordDrafts] = useState<Record<string, Record<string, string>>>({});
   const ownTasks = useMemo(() => tasks.filter((task) => task.owner_id === props.userId), [tasks, props.userId]);
   const canManage = props.role === "owner" || props.role === "manager";
   const visibleResponsibilities = canManage
@@ -194,12 +200,62 @@ export default function Dashboard(props: {
     setAvatarBusy(false);
   }
 
+  async function removeAvatar() {
+    setAvatarBusy(true);
+    setAvatarMessage("");
+    const { error } = await createClient().from("profiles").update({ avatar_url: null }).eq("id", props.userId);
+    if (!error) {
+      setAvatarUrl("");
+      updateMemberProfile(props.userId, { avatar_url: null });
+    }
+    setAvatarMessage(error ? "Не удалось убрать фотографию." : "Фото убрано — снова используется цветной аватар.");
+    setAvatarBusy(false);
+  }
+
   function Avatar({ profile, className = "" }: { profile?: MemberProfile | null; className?: string }) {
     const color = profile?.avatar_color || "#7655d8";
     const url = profile?.avatar_url;
     return <span className={`avatar ${className}`} style={{ backgroundColor: color }}>
       {url ? <img src={url} alt="" /> : (profile?.full_name?.slice(0, 1) || "•")}
     </span>;
+  }
+
+  async function createPersonalDatabase(event: React.FormEvent) {
+    event.preventDefault();
+    const columns = databaseColumns.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 12);
+    if (!databaseName.trim() || !columns.length) return;
+    setDatabaseMessage("");
+    const { data, error } = await createClient().from("personal_databases").insert({
+      owner_id: props.userId,
+      name: databaseName.trim(),
+      columns,
+      records: [],
+    }).select("id,name,columns,records,created_at").single();
+    if (error || !data) {
+      setDatabaseMessage("Не удалось создать базу.");
+      return;
+    }
+    setDatabases((items) => [data, ...items]);
+    setDatabaseName("");
+    setDatabaseColumns("");
+    setDatabaseMessage("Личная база создана.");
+  }
+
+  async function addDatabaseRecord(database: PersonalDatabase) {
+    const draft = recordDrafts[database.id] || {};
+    if (!database.columns.some((column) => draft[column]?.trim())) return;
+    const records = [...database.records, Object.fromEntries(database.columns.map((column) => [column, draft[column]?.trim() || ""]))];
+    const { error } = await createClient().from("personal_databases").update({ records }).eq("id", database.id);
+    if (!error) {
+      setDatabases((items) => items.map((item) => item.id === database.id ? { ...item, records } : item));
+      setRecordDrafts((items) => ({ ...items, [database.id]: {} }));
+    }
+  }
+
+  async function removePersonalDatabase(database: PersonalDatabase) {
+    if (!window.confirm(`Удалить личную базу «${database.name}»?`)) return;
+    const { error } = await createClient().from("personal_databases").delete().eq("id", database.id);
+    if (!error) setDatabases((items) => items.filter((item) => item.id !== database.id));
   }
 
   function invitationLink(token: string) {
@@ -428,6 +484,7 @@ export default function Dashboard(props: {
           <button className={tab === "duties" ? "active" : ""} onClick={() => setTab("duties")}>☷ Обязанности</button>
           <button className={tab === "structure" ? "active" : ""} onClick={() => setTab("structure")}>⌘ Структура</button>
           <button className={tab === "kpi" ? "active" : ""} onClick={() => setTab("kpi")}>↗ KPI</button>
+          <button className={tab === "database" ? "active" : ""} onClick={() => setTab("database")}>▦ Мои базы</button>
           {canManage && <button className={tab === "team" ? "active" : ""} onClick={() => setTab("team")}>◎ Команда <b>{members.length}</b></button>}
         </nav>
         <div className="profile">
@@ -447,8 +504,9 @@ export default function Dashboard(props: {
           <div className="avatar-preview"><Avatar profile={{ full_name: props.name, avatar_url: avatarUrl, avatar_color: avatarColor }} /></div>
           <label className="avatar-upload">
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadAvatar} disabled={avatarBusy} />
-            {avatarBusy ? "Загружаем…" : "Выбрать фотографию"}
+            {avatarBusy ? "Сохраняем…" : avatarUrl ? "Сменить фотографию" : "Выбрать фотографию"}
           </label>
+          {avatarUrl && <button className="avatar-remove" onClick={removeAvatar} disabled={avatarBusy}>Убрать фото и вернуть цветной аватар</button>}
           <div className="color-picker">
             <span>Цвет профиля</span>
             <div>{["#7655d8", "#a8d957", "#ef8d72", "#56b8a7", "#e4a63d", "#b866c8"].map((color) => (
@@ -590,6 +648,29 @@ export default function Dashboard(props: {
                 </article>;
               })}
               {!metrics.length && <div className="empty"><b>KPI пока нет</b><p>Руководитель может создать первую измеримую цель.</p></div>}
+            </div>
+          </div>
+        ) : tab === "database" ? (
+          <div className="content database-content">
+            <p className="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</p>
+            <h1>Мои базы</h1>
+            <p className="lead">Создавайте собственные таблицы для контактов, идей, клиентов или любых рабочих записей. Их видите только вы.</p>
+            <form className="database-create" onSubmit={createPersonalDatabase}>
+              <label>Название базы<input required value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} placeholder="Например, Клиенты" /></label>
+              <label>Колонки через запятую<input required value={databaseColumns} onChange={(event) => setDatabaseColumns(event.target.value)} placeholder="Имя, Телефон, Статус" /></label>
+              <button className="primary">＋ Создать базу</button>
+              {databaseMessage && <small>{databaseMessage}</small>}
+            </form>
+            <div className="database-list">
+              {databases.map((database) => <section className="database-card" key={database.id}>
+                <header><div><small>ЛИЧНАЯ БАЗА</small><h2>{database.name}</h2></div><button onClick={() => removePersonalDatabase(database)}>Удалить</button></header>
+                <div className="database-table-wrap"><table><thead><tr>{database.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+                  <tbody>{database.records.map((record, index) => <tr key={index}>{database.columns.map((column) => <td key={column}>{record[column] || "—"}</td>)}</tr>)}
+                    <tr className="database-new-row">{database.columns.map((column) => <td key={column}><input value={recordDrafts[database.id]?.[column] || ""} onChange={(event) => setRecordDrafts((items) => ({ ...items, [database.id]: { ...(items[database.id] || {}), [column]: event.target.value } }))} placeholder="Введите значение" /></td>)}</tr>
+                  </tbody></table></div>
+                <button className="database-add-row" onClick={() => addDatabaseRecord(database)}>＋ Добавить строку</button>
+              </section>)}
+              {!databases.length && <div className="empty"><b>Личных баз пока нет</b><p>Создайте первую таблицу — например, список клиентов или библиотеку идей.</p></div>}
             </div>
           </div>
         ) : (

@@ -36,7 +36,7 @@ export default async function HomePage({
     return <Onboarding name={profile?.full_name || user.user_metadata?.full_name || ""} invitationError={invitationError} />;
   }
 
-  const [{ data: tasks }, { data: members }, { data: invitations }, { data: positions }, { data: responsibilities }, { data: metrics }] = await Promise.all([
+  const [{ data: tasks }, { data: members }, { data: invitations }, { data: positions }, { data: responsibilities }, { data: metrics }, { data: personalDatabases }] = await Promise.all([
     supabase.from("tasks").select("*").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }),
     supabase.from("organization_members")
       .select("user_id,role,job_title,position_id,is_notification_contact,work_start_time,profiles(full_name,email,employee_description,birth_date,avatar_url,avatar_color)")
@@ -60,6 +60,10 @@ export default async function HomePage({
       .eq("organization_id", membership.organization_id)
       .eq("is_active", true)
       .order("created_at"),
+    supabase.from("personal_databases")
+      .select("id,name,columns,records,created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false }),
   ]);
 
   const organization = Array.isArray(membership.organizations)
@@ -82,6 +86,7 @@ export default async function HomePage({
       initialPositions={positions || []}
       initialResponsibilities={responsibilities || []}
       initialMetrics={metrics || []}
+      initialDatabases={personalDatabases || []}
     />
   );
 }
