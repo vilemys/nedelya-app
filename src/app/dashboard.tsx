@@ -19,6 +19,7 @@ export default function Dashboard(props: {
 }) {
   const [tasks, setTasks] = useState(props.initialTasks);
   const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [tab, setTab] = useState<"tasks" | "stats" | "duties" | "structure" | "kpi" | "database" | "team">("tasks");
   const [busy, setBusy] = useState(false);
   const [invitations, setInvitations] = useState(props.initialInvitations);
@@ -54,6 +55,9 @@ export default function Dashboard(props: {
   const [databaseColumns, setDatabaseColumns] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [recordDrafts, setRecordDrafts] = useState<Record<string, Record<string, string>>>({});
+  const [recordLinks, setRecordLinks] = useState<Record<string, string>>({});
+  const [recordFiles, setRecordFiles] = useState<Record<string, File | null>>({});
+  const [databaseBusy, setDatabaseBusy] = useState("");
   const ownTasks = useMemo(() => tasks.filter((task) => task.owner_id === props.userId), [tasks, props.userId]);
   const canManage = props.role === "owner" || props.role === "manager";
   const visibleResponsibilities = canManage
@@ -126,6 +130,15 @@ export default function Dashboard(props: {
   }, [members]);
 
   const isNotificationContact = members.some((member) => member.user_id === props.userId && member.is_notification_contact);
+  const personalNotifications = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return ownTasks.filter((task) => task.status !== "done" && task.due_date).map((task) => {
+      const deadline = new Date(`${task.due_date}T00:00:00`);
+      const days = Math.round((deadline.getTime() - today.getTime()) / 86400000);
+      return { task, days };
+    }).filter((item) => item.days <= 3).sort((a, b) => a.days - b.days);
+  }, [ownTasks]);
 
   function taskStats(userId: string) {
     const items = tasks.filter((task) => task.owner_id === userId);
@@ -142,11 +155,12 @@ export default function Dashboard(props: {
     const supabase = createClient();
     const { data, error } = await supabase.from("tasks").insert({
       organization_id: props.organizationId, owner_id: props.userId, title: title.trim(),
-      status: "planned", priority: "medium",
+      status: "planned", priority: "medium", due_date: dueDate || null,
     }).select().single();
     if (!error && data) {
       setTasks((items) => [data, ...items]);
       setTitle("");
+      setDueDate("");
     }
     setBusy(false);
   }
@@ -243,13 +257,49 @@ export default function Dashboard(props: {
 
   async function addDatabaseRecord(database: PersonalDatabase) {
     const draft = recordDrafts[database.id] || {};
-    if (!database.columns.some((column) => draft[column]?.trim())) return;
-    const records = [...database.records, Object.fromEntries(database.columns.map((column) => [column, draft[column]?.trim() || ""]))];
+    const link = recordLinks[database.id]?.trim() || "";
+    const file = recordFiles[database.id];
+    if (!database.columns.some((column) => draft[column]?.trim()) && !link && !file) return;
+    if (file && file.size > 10 * 1024 * 1024) {
+      setDatabaseMessage("Размер файла не должен превышать 10 МБ.");
+      return;
+    }
+    setDatabaseBusy(database.id);
+    let filePath = "";
+    if (file) {
+      const safeName = file.name.replace(/[^a-zA-Zа-яА-Я0-9._-]/g, "-");
+      filePath = `${props.userId}/${database.id}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await createClient().storage.from("personal-files").upload(filePath, file);
+      if (uploadError) {
+        setDatabaseMessage("Не удалось загрузить файл.");
+        setDatabaseBusy("");
+        return;
+      }
+    }
+    const record = {
+      ...Object.fromEntries(database.columns.map((column) => [column, draft[column]?.trim() || ""])),
+      _link: link,
+      _file_path: filePath,
+      _file_name: file?.name || "",
+    };
+    const records = [...database.records, record];
     const { error } = await createClient().from("personal_databases").update({ records }).eq("id", database.id);
     if (!error) {
       setDatabases((items) => items.map((item) => item.id === database.id ? { ...item, records } : item));
       setRecordDrafts((items) => ({ ...items, [database.id]: {} }));
+      setRecordLinks((items) => ({ ...items, [database.id]: "" }));
+      setRecordFiles((items) => ({ ...items, [database.id]: null }));
     }
+    setDatabaseBusy("");
+  }
+
+  async function openPersonalFile(path: string) {
+    const { data, error } = await createClient().storage.from("personal-files").createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) {
+      setDatabaseMessage("Не удалось открыть файл.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   async function removePersonalDatabase(database: PersonalDatabase) {
@@ -527,11 +577,19 @@ export default function Dashboard(props: {
                 <article key={item.userId}><b>{item.name}</b><span>{item.days === 0 ? "День рождения сегодня" : item.days === 1 ? "День рождения завтра" : `Через ${item.days} дн.`}</span><time>{item.date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</time></article>
               )) : <p>В ближайшие 30 дней дней рождения нет.</p>}
             </section>}
+            {!!personalNotifications.length && <section className="personal-notifications">
+              <div><span>🔔</span><div><strong>Личные уведомления</strong><small>Только ваши задачи и сроки</small></div></div>
+              {personalNotifications.map(({ task, days }) => <article key={task.id}>
+                <b>{task.title}</b>
+                <span className={days < 0 ? "overdue" : ""}>{days < 0 ? `Просрочено на ${Math.abs(days)} дн.` : days === 0 ? "Срок сегодня" : days === 1 ? "Срок завтра" : `Осталось ${days} дн.`}</span>
+              </article>)}
+            </section>}
             <p className="eyebrow">МОЁ ПРОСТРАНСТВО</p>
             <h1>Добрый день{props.name ? `, ${props.name.split(" ")[0]}` : ""}!</h1>
             <p className="lead">Здесь только ваши задачи. Начните с первой.</p>
             <form className="quick-add" onSubmit={addTask}>
               <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Что нужно сделать?" />
+              <label className="task-deadline"><span>Срок</span><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
               <button className="primary" disabled={busy}>＋ Добавить</button>
             </form>
             <div className="list-heading"><h2>Мои задачи</h2><span>{ownTasks.length}</span></div>
@@ -540,7 +598,7 @@ export default function Dashboard(props: {
                 <article className={task.status === "done" ? "task done" : "task"} key={task.id}>
                   <button className="check" onClick={() => toggle(task)}>{task.status === "done" ? "✓" : ""}</button>
                   <strong>{task.title}</strong>
-                  <span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>
+                  <div className="task-meta"><span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>{task.due_date && <time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</time>}</div>
                 </article>
               ))}
               {!ownTasks.length && <div className="empty"><b>Пока нет задач</b><p>Добавьте первую задачу — пространство создано специально для вас.</p></div>}
@@ -664,11 +722,11 @@ export default function Dashboard(props: {
             <div className="database-list">
               {databases.map((database) => <section className="database-card" key={database.id}>
                 <header><div><small>ЛИЧНАЯ БАЗА</small><h2>{database.name}</h2></div><button onClick={() => removePersonalDatabase(database)}>Удалить</button></header>
-                <div className="database-table-wrap"><table><thead><tr>{database.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
-                  <tbody>{database.records.map((record, index) => <tr key={index}>{database.columns.map((column) => <td key={column}>{record[column] || "—"}</td>)}</tr>)}
-                    <tr className="database-new-row">{database.columns.map((column) => <td key={column}><input value={recordDrafts[database.id]?.[column] || ""} onChange={(event) => setRecordDrafts((items) => ({ ...items, [database.id]: { ...(items[database.id] || {}), [column]: event.target.value } }))} placeholder="Введите значение" /></td>)}</tr>
+                <div className="database-table-wrap"><table><thead><tr>{database.columns.map((column) => <th key={column}>{column}</th>)}<th>Ссылка</th><th>Файл</th></tr></thead>
+                  <tbody>{database.records.map((record, index) => <tr key={index}>{database.columns.map((column) => <td key={column}>{record[column] || "—"}</td>)}<td>{record._link ? <a href={record._link} target="_blank" rel="noreferrer">Открыть ↗</a> : "—"}</td><td>{record._file_path ? <button className="database-file-link" onClick={() => openPersonalFile(record._file_path)}>📎 {record._file_name || "Файл"}</button> : "—"}</td></tr>)}
+                    <tr className="database-new-row">{database.columns.map((column) => <td key={column}><input value={recordDrafts[database.id]?.[column] || ""} onChange={(event) => setRecordDrafts((items) => ({ ...items, [database.id]: { ...(items[database.id] || {}), [column]: event.target.value } }))} placeholder="Введите значение" /></td>)}<td><input type="url" value={recordLinks[database.id] || ""} onChange={(event) => setRecordLinks((items) => ({ ...items, [database.id]: event.target.value }))} placeholder="https://…" /></td><td><label className="database-file-picker"><input type="file" onChange={(event) => setRecordFiles((items) => ({ ...items, [database.id]: event.target.files?.[0] || null }))} />{recordFiles[database.id]?.name || "＋ Выбрать файл"}</label></td></tr>
                   </tbody></table></div>
-                <button className="database-add-row" onClick={() => addDatabaseRecord(database)}>＋ Добавить строку</button>
+                <button className="database-add-row" disabled={databaseBusy === database.id} onClick={() => addDatabaseRecord(database)}>{databaseBusy === database.id ? "Сохраняем…" : "＋ Добавить строку"}</button>
               </section>)}
               {!databases.length && <div className="empty"><b>Личных баз пока нет</b><p>Создайте первую таблицу — например, список клиентов или библиотеку идей.</p></div>}
             </div>
