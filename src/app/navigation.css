@@ -196,3 +196,30 @@ h1,h2,.content h1,.auth-story h1,.auth-form h2,.onboarding-card h1{letter-spacin
   .lead{font-size:14px}.topbar nav button{font-size:12px}.topbar .brand{font-size:18px}
   .profile-dialog h2{font-size:26px}.auth-form h2{font-size:30px}
 }
+
+/* Настройки аккаунта и управление доступами */
+.profile-dialog{width:min(520px,100%);max-height:min(90vh,820px);overflow-y:auto}
+.account-settings{display:grid;gap:13px;margin-top:26px;padding-top:24px;border-top:1px solid #e8dff6}
+.account-settings h3,.account-settings p{margin:0}.account-settings h3{font-size:20px}.account-settings>div p{margin-top:4px;color:var(--muted);font-size:12px}
+.account-settings label{font-size:13px;font-weight:750}.account-settings input{display:block;width:100%;height:44px;margin-top:6px;border:1px solid var(--line);border-radius:11px;background:#fff;padding:0 12px;font-size:14px}
+.account-settings .primary{width:100%}.account-settings>p{font-size:12px}
+.member-role,.member-position{font-size:12px;color:var(--muted)}
+.member-role select,.member-position select{display:block;width:100%;height:40px;margin-top:5px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 10px;font-size:13px}
+.member-role button{margin-top:7px;border:0;background:transparent;color:#6546bb;padding:0;font-size:12px;font-weight:750;cursor:pointer}
+.member-list article.member-card.owner-controls{grid-template-columns:46px 1fr minmax(190px,230px) minmax(180px,220px)}.role-spacer{display:block}
+
+/* Выразительные действия в списке должностей */
+.position-buttons{align-items:center}
+.position-buttons button{min-height:42px;padding:0 17px;border:1px solid transparent;border-radius:11px;font-weight:750;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,background .16s ease}
+.position-buttons button:first-child{background:#7655d8;color:#fff;box-shadow:0 7px 16px rgba(118,85,216,.2)}
+.position-buttons button:first-child:hover{background:#6747c7;transform:translateY(-1px)}
+.position-buttons .danger-button{border-color:#efd9d5!important;background:#fff8f6!important;color:#a3473d!important}
+.position-buttons .danger-button:hover{background:#ffefeb!important;transform:translateY(-1px)}
+.position-buttons button:active{transform:translateY(0);box-shadow:none}
+.database-card.read-only{background:#fbf9ff;border-style:dashed}.database-read-only-note{display:inline-flex;margin:13px 0 0;padding:7px 10px;border-radius:8px;background:#eee8fa;color:#6b53a8;font-size:12px;font-weight:750}
+
+@media(max-width:1180px){.member-role,.member-position{grid-column:auto}.member-list article.member-card,.member-list article.member-card.owner-controls{grid-template-columns:46px 1fr minmax(190px,230px)}.member-card.owner-controls .member-position{grid-column:3}.role-spacer{display:none}}
+@media(max-width:760px){
+  .member-role,.member-position{grid-column:1/-1}.member-role button{display:block;margin-top:9px}
+  .position-buttons{display:grid;grid-template-columns:1fr 1fr;width:100%}.position-buttons button{width:100%}
+}

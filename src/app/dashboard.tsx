@@ -10,7 +10,7 @@ type Invitation = { id: string; email: string; role: string; position_id: string
 type Position = { id: string; name: string; parent_position_id: string | null; purpose: string };
 type Responsibility = { id: string; assignee_id: string; title: string; expected_result: string; is_active: boolean };
 type KpiMetric = { id: string; assignee_id: string | null; name: string; description: string; unit: string; target_value: number; current_value: number; period: "week" | "month" | "quarter"; is_active: boolean };
-type PersonalDatabase = { id: string; name: string; columns: string[]; records: Record<string, string>[]; created_at: string };
+type PersonalDatabase = { id: string; owner_id: string; name: string; columns: string[]; records: Record<string, string>[]; created_at: string; profiles?: MemberProfile | MemberProfile[] | null };
 
 export default function Dashboard(props: {
   userId: string; name: string; email: string; avatarUrl: string; avatarColor: string; organizationId: string; organizationName: string;
@@ -50,6 +50,10 @@ export default function Dashboard(props: {
   const [avatarColor, setAvatarColor] = useState(props.avatarColor);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarMessage, setAvatarMessage] = useState("");
+  const [accountEmail, setAccountEmail] = useState(props.email);
+  const [newPassword, setNewPassword] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountMessage, setAccountMessage] = useState("");
   const [databases, setDatabases] = useState(props.initialDatabases);
   const [databaseName, setDatabaseName] = useState("");
   const [databaseColumns, setDatabaseColumns] = useState("");
@@ -179,6 +183,51 @@ export default function Dashboard(props: {
     window.location.href = "/auth";
   }
 
+  async function saveAccountSettings(event: React.FormEvent) {
+    event.preventDefault();
+    if (newPassword && newPassword.length < 8) {
+      setAccountMessage("Пароль должен содержать не меньше 8 символов.");
+      return;
+    }
+    setAccountBusy(true);
+    setAccountMessage("");
+    const changes: { email?: string; password?: string } = {};
+    if (accountEmail.trim().toLowerCase() !== props.email.toLowerCase()) changes.email = accountEmail.trim().toLowerCase();
+    if (newPassword) changes.password = newPassword;
+    if (!Object.keys(changes).length) {
+      setAccountMessage("Нет изменений для сохранения.");
+      setAccountBusy(false);
+      return;
+    }
+    const { error } = await createClient().auth.updateUser(changes);
+    if (error) {
+      setAccountMessage(error.message.includes("password") ? "Не удалось изменить пароль." : "Не удалось изменить почту.");
+    } else {
+      setNewPassword("");
+      setAccountMessage(changes.email
+        ? "Настройки сохранены. Подтвердите новую почту по ссылке из письма."
+        : "Пароль успешно изменён.");
+    }
+    setAccountBusy(false);
+  }
+
+  async function changeMemberRole(userId: string, role: "manager" | "employee") {
+    setProfileMessage("");
+    const { error } = await createClient().rpc("set_member_role", { target_user_id: userId, new_role: role });
+    if (!error) setMembers((items) => items.map((member) => member.user_id === userId ? { ...member, role } : member));
+    setProfileMessage(error ? "Не удалось изменить роль. Установите обновление базы." : `Роль сотрудника «${memberName(userId)}» изменена.`);
+  }
+
+  async function transferOwnership(userId: string) {
+    if (!window.confirm(`Передать права владельца пользователю «${memberName(userId)}»? Вы станете руководителем.`)) return;
+    const { error } = await createClient().rpc("transfer_organization_ownership", { target_user_id: userId });
+    if (error) {
+      setProfileMessage("Не удалось передать права владельца. Установите обновление базы.");
+      return;
+    }
+    window.location.reload();
+  }
+
   async function saveAvatarColor(color: string) {
     setAvatarColor(color);
     setAvatarMessage("");
@@ -249,7 +298,7 @@ export default function Dashboard(props: {
       setDatabaseMessage("Не удалось создать базу.");
       return;
     }
-    setDatabases((items) => [data, ...items]);
+    setDatabases((items) => [{ ...data, owner_id: props.userId }, ...items]);
     setDatabaseName("");
     setDatabaseColumns("");
     setDatabaseMessage("Личная база создана.");
@@ -537,6 +586,13 @@ export default function Dashboard(props: {
           </div>
           {avatarMessage && <p className="avatar-message">{avatarMessage}</p>}
           <small>Подойдут JPG, PNG или WebP до 2 МБ.</small>
+          <form className="account-settings" onSubmit={saveAccountSettings}>
+            <div><h3>Вход и безопасность</h3><p>Измените почту или задайте новый пароль.</p></div>
+            <label>Электронная почта<input required type="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} /></label>
+            <label>Новый пароль<input type="password" minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Не меньше 8 символов" autoComplete="new-password" /></label>
+            <button className="primary" disabled={accountBusy}>{accountBusy ? "Сохраняем…" : "Сохранить настройки"}</button>
+            {accountMessage && <p className={accountMessage.startsWith("Не удалось") || accountMessage.startsWith("Пароль должен") ? "form-error" : "form-success"}>{accountMessage}</p>}
+          </form>
         </section>
       </div>}
 
@@ -673,9 +729,9 @@ export default function Dashboard(props: {
           </div>
         ) : tab === "database" ? (
           <div className="content database-content">
-            <p className="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</p>
-            <h1>Мои базы</h1>
-            <p className="lead">Создавайте собственные таблицы для контактов, идей, клиентов или любых рабочих записей. Их видите только вы.</p>
+            <p className="eyebrow">РАБОЧИЕ НАРАБОТКИ</p>
+            <h1>{canManage ? "Базы команды" : "Мои базы"}</h1>
+            <p className="lead">{canManage ? "Ваши базы можно редактировать, базы сотрудников доступны только для просмотра." : "Создавайте собственные таблицы для контактов, идей, клиентов или любых рабочих записей."}</p>
             <form className="database-create" onSubmit={createPersonalDatabase}>
               <label>Название базы<input required value={databaseName} onChange={(event) => setDatabaseName(event.target.value)} placeholder="Например, Клиенты" /></label>
               <label>Колонки через запятую<input required value={databaseColumns} onChange={(event) => setDatabaseColumns(event.target.value)} placeholder="Имя, Телефон, Статус" /></label>
@@ -683,14 +739,17 @@ export default function Dashboard(props: {
               {databaseMessage && <small>{databaseMessage}</small>}
             </form>
             <div className="database-list">
-              {databases.map((database) => <section className="database-card" key={database.id}>
-                <header><div><small>ЛИЧНАЯ БАЗА</small><h2>{database.name}</h2></div><button onClick={() => removePersonalDatabase(database)}>Удалить</button></header>
+              {databases.map((database) => {
+                const isOwnDatabase = database.owner_id === props.userId;
+                const databaseProfile = Array.isArray(database.profiles) ? database.profiles[0] : database.profiles;
+                return <section className={`database-card ${isOwnDatabase ? "" : "read-only"}`} key={database.id}>
+                <header><div><small>{isOwnDatabase ? "МОЯ БАЗА" : `БАЗА СОТРУДНИКА · ${databaseProfile?.full_name || databaseProfile?.email || memberName(database.owner_id)}`}</small><h2>{database.name}</h2></div>{isOwnDatabase && <button onClick={() => removePersonalDatabase(database)}>Удалить</button>}</header>
                 <div className="database-table-wrap"><table><thead><tr>{database.columns.map((column) => <th key={column}>{column}</th>)}<th>Ссылка</th><th>Файл</th></tr></thead>
                   <tbody>{database.records.map((record, index) => <tr key={index}>{database.columns.map((column) => <td key={column}>{record[column] || "—"}</td>)}<td>{record._link ? <a href={record._link} target="_blank" rel="noreferrer">Открыть ↗</a> : "—"}</td><td>{record._file_path ? <button className="database-file-link" onClick={() => openPersonalFile(record._file_path)}>📎 {record._file_name || "Файл"}</button> : "—"}</td></tr>)}
-                    <tr className="database-new-row">{database.columns.map((column) => <td key={column}><input value={recordDrafts[database.id]?.[column] || ""} onChange={(event) => setRecordDrafts((items) => ({ ...items, [database.id]: { ...(items[database.id] || {}), [column]: event.target.value } }))} placeholder="Введите значение" /></td>)}<td><input type="url" value={recordLinks[database.id] || ""} onChange={(event) => setRecordLinks((items) => ({ ...items, [database.id]: event.target.value }))} placeholder="https://…" /></td><td><label className="database-file-picker"><input type="file" onChange={(event) => setRecordFiles((items) => ({ ...items, [database.id]: event.target.files?.[0] || null }))} />{recordFiles[database.id]?.name || "＋ Выбрать файл"}</label></td></tr>
+                    {isOwnDatabase && <tr className="database-new-row">{database.columns.map((column) => <td key={column}><input value={recordDrafts[database.id]?.[column] || ""} onChange={(event) => setRecordDrafts((items) => ({ ...items, [database.id]: { ...(items[database.id] || {}), [column]: event.target.value } }))} placeholder="Введите значение" /></td>)}<td><input type="url" value={recordLinks[database.id] || ""} onChange={(event) => setRecordLinks((items) => ({ ...items, [database.id]: event.target.value }))} placeholder="https://…" /></td><td><label className="database-file-picker"><input type="file" onChange={(event) => setRecordFiles((items) => ({ ...items, [database.id]: event.target.files?.[0] || null }))} />{recordFiles[database.id]?.name || "＋ Выбрать файл"}</label></td></tr>}
                   </tbody></table></div>
-                <button className="database-add-row" disabled={databaseBusy === database.id} onClick={() => addDatabaseRecord(database)}>{databaseBusy === database.id ? "Сохраняем…" : "＋ Добавить строку"}</button>
-              </section>)}
+                {isOwnDatabase ? <button className="database-add-row" disabled={databaseBusy === database.id} onClick={() => addDatabaseRecord(database)}>{databaseBusy === database.id ? "Сохраняем…" : "＋ Добавить строку"}</button> : <p className="database-read-only-note">Только просмотр</p>}
+              </section>})}
               {!databases.length && <div className="empty"><b>Личных баз пока нет</b><p>Создайте первую таблицу — например, список клиентов или библиотеку идей.</p></div>}
             </div>
           </div>
@@ -734,9 +793,10 @@ export default function Dashboard(props: {
             <div className="member-list">
               {members.map((member) => {
                 const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-                return <article className="member-card" key={member.user_id}>
+                return <article className={`member-card ${props.role === "owner" ? "owner-controls" : ""}`} key={member.user_id}>
                   <Avatar profile={profile} />
                   <div className="member-identity"><strong>{profile?.full_name || profile?.email}</strong><small>{member.role === "owner" ? "Владелец" : member.role === "manager" ? "Руководитель" : "Сотрудник"}{member.job_title ? ` · ${member.job_title}` : ""}{member.is_notification_contact ? " · Ответственный за уведомления" : ""}</small></div>
+                  {props.role === "owner" && (member.role !== "owner" ? <label className="member-role">Доступ<select value={member.role} onChange={(event) => changeMemberRole(member.user_id, event.target.value as "manager" | "employee")}><option value="employee">Сотрудник</option><option value="manager">Руководитель — полный доступ</option></select>{member.role === "manager" && <button onClick={() => transferOwnership(member.user_id)}>Передать права владельца</button>}</label> : <span className="role-spacer" />)}
                   <label className="member-position">Должность<select value={member.position_id || ""} onChange={(event) => changeMemberPosition(member.user_id, event.target.value)}><option value="">Не выбрана</option>{positions.map((position) => <option key={position.id} value={position.id}>{position.name}</option>)}</select></label>
                   <div className="member-details">
                     <label>Дата рождения<input type="date" value={profile?.birth_date || ""} onChange={(event) => updateMemberProfile(member.user_id, { birth_date: event.target.value || null })} /></label>

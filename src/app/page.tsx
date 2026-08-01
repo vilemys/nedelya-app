@@ -61,8 +61,7 @@ export default async function HomePage({
       .eq("is_active", true)
       .order("created_at"),
     supabase.from("personal_databases")
-      .select("id,name,columns,records,created_at")
-      .eq("owner_id", user.id)
+      .select("id,owner_id,name,columns,records,created_at,profiles(full_name,email)")
       .order("created_at", { ascending: false }),
   ]);
 
