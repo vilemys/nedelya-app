@@ -70,6 +70,9 @@
   .org-canvas{margin-inline:-20px;padding:28px 20px;border-radius:0;border-left:0;border-right:0}.org-tree{justify-content:flex-start}.org-node{width:205px}.org-children{gap:18px}
 }
 
+.quick-add{grid-template-columns:minmax(220px,1fr) 165px 145px auto}.task-priority{position:relative}.task-priority>span{position:absolute;z-index:1;top:7px;left:12px;color:#786d90;font-size:9px;font-weight:750}.task-priority select{width:100%;height:52px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:18px 10px 4px;font-size:13px}
+@media(max-width:760px){.quick-add{grid-template-columns:1fr}.task-priority select{width:100%}}
+
 /* Более крупная типографика и лёгкая карточная эстетика в духе MyMeet */
 body,button,input,select,textarea{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
 h1,h2,.content h1,.auth-story h1,.auth-form h2,.onboarding-card h1{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-weight:700;letter-spacing:-.045em}
@@ -222,4 +225,18 @@ h1,h2,.content h1,.auth-story h1,.auth-form h2,.onboarding-card h1{letter-spacin
 @media(max-width:760px){
   .member-role,.member-position{grid-column:1/-1}.member-role button{display:block;margin-top:9px}
   .position-buttons{display:grid;grid-template-columns:1fr 1fr;width:100%}.position-buttons button{width:100%}
+}
+
+/* Управление и фильтрация личных задач */
+.task-filters{display:flex;align-items:end;gap:10px;margin:14px 0 18px;padding:13px 14px;border:1px solid #e5dcf5;border-radius:14px;background:rgba(255,255,255,.72)}
+.task-filters label{min-width:150px;color:var(--muted);font-size:12px;font-weight:750}.task-filters select{display:block;width:100%;height:38px;margin-top:5px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 10px;font-size:13px}
+.task-filters>button{height:38px;border:0;border-radius:9px;background:#eee8fa;color:#6548b6;padding:0 13px;font-size:12px;font-weight:750;cursor:pointer}
+.task{grid-template-columns:22px minmax(0,1fr) auto}.task-meta{min-width:190px;justify-content:flex-end}.task-actions{display:flex;gap:4px;margin-left:3px}.task-actions button{width:30px;height:30px;border:1px solid #e5dcf3;border-radius:8px;background:#fff;color:#684bc0;font-size:15px;cursor:pointer}.task-actions button:last-child{color:#a54b43}
+.task-edit{grid-column:2/-1;display:grid;grid-template-columns:minmax(200px,1fr) 130px 150px auto;gap:8px;align-items:center}.task-edit input,.task-edit select{width:100%;height:40px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 10px;font-size:13px}.task-edit>div{display:flex;gap:5px}.task-edit button{height:38px;border:0;border-radius:9px;background:#7655d8;color:#fff;padding:0 11px;font-size:12px;font-weight:750;cursor:pointer}.task-edit button:last-child{background:#eee8fa;color:#6548b6}
+.personal-notifications>p{margin:12px 0 0;color:var(--muted);font-size:12px}.personal-notifications article>div b,.personal-notifications article>div small{display:block}.personal-notifications article>div small{margin-top:3px}
+
+@media(max-width:760px){
+  .task-filters{display:grid;grid-template-columns:1fr 1fr}.task-filters label{min-width:0}.task-filters label:first-child{grid-column:1/-1}.task-filters>button{grid-column:1/-1;width:100%}
+  .task{grid-template-columns:22px minmax(0,1fr);align-items:start}.task-meta{grid-column:2;min-width:0;justify-content:flex-start;flex-flow:row wrap;align-items:center}.task-actions{margin-left:auto}
+  .task-edit{grid-column:2;grid-template-columns:1fr}.task-edit>div{display:grid;grid-template-columns:1fr 1fr}.task-edit button{width:100%}
 }

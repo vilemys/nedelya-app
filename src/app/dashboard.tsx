@@ -20,6 +20,7 @@ export default function Dashboard(props: {
   const [tasks, setTasks] = useState(props.initialTasks);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high">("medium");
   const [tab, setTab] = useState<"tasks" | "stats" | "duties" | "structure" | "kpi" | "database" | "team">("tasks");
   const [busy, setBusy] = useState(false);
   const [invitations, setInvitations] = useState(props.initialInvitations);
@@ -62,6 +63,14 @@ export default function Dashboard(props: {
   const [recordLinks, setRecordLinks] = useState<Record<string, string>>({});
   const [recordFiles, setRecordFiles] = useState<Record<string, File | null>>({});
   const [databaseBusy, setDatabaseBusy] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState<"all" | "active" | "done">("all");
+  const [taskDueFilter, setTaskDueFilter] = useState<"all" | "overdue" | "today" | "week" | "no-date">("all");
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState<"all" | "low" | "medium" | "high">("all");
+  const [editingTaskId, setEditingTaskId] = useState("");
+  const [editingTaskTitle, setEditingTaskTitle] = useState("");
+  const [editingTaskDueDate, setEditingTaskDueDate] = useState("");
+  const [editingTaskPriority, setEditingTaskPriority] = useState<"low" | "medium" | "high">("medium");
+  const [taskMessage, setTaskMessage] = useState("");
   const ownTasks = useMemo(() => tasks.filter((task) => task.owner_id === props.userId), [tasks, props.userId]);
   const canManage = props.role === "owner" || props.role === "manager";
   const visibleResponsibilities = canManage
@@ -143,6 +152,24 @@ export default function Dashboard(props: {
       return { task, days };
     }).filter((item) => item.days <= 3).sort((a, b) => a.days - b.days);
   }, [ownTasks]);
+  const filteredOwnTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(today);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    return ownTasks.filter((task) => {
+      if (taskStatusFilter === "active" && task.status === "done") return false;
+      if (taskStatusFilter === "done" && task.status !== "done") return false;
+      if (taskPriorityFilter !== "all" && task.priority !== taskPriorityFilter) return false;
+      if (taskDueFilter === "no-date") return !task.due_date;
+      if (taskDueFilter === "all") return true;
+      if (!task.due_date) return false;
+      const deadline = new Date(`${task.due_date}T00:00:00`);
+      if (taskDueFilter === "overdue") return task.status !== "done" && deadline < today;
+      if (taskDueFilter === "today") return deadline.getTime() === today.getTime();
+      return deadline >= today && deadline <= weekEnd;
+    });
+  }, [ownTasks, taskStatusFilter, taskDueFilter, taskPriorityFilter]);
 
   function taskStats(userId: string) {
     const items = tasks.filter((task) => task.owner_id === userId);
@@ -159,7 +186,7 @@ export default function Dashboard(props: {
     const supabase = createClient();
     const { data, error } = await supabase.from("tasks").insert({
       organization_id: props.organizationId, owner_id: props.userId, title: title.trim(),
-      status: "planned", priority: "medium", due_date: dueDate || null,
+      status: "planned", priority: newTaskPriority, due_date: dueDate || null,
     }).select().single();
     if (!error && data) {
       setTasks((items) => [data, ...items]);
@@ -176,6 +203,32 @@ export default function Dashboard(props: {
       status, completed_at: status === "done" ? new Date().toISOString() : null,
     }).eq("id", task.id);
     if (!error) setTasks((items) => items.map((item) => item.id === task.id ? { ...item, status } : item));
+  }
+
+  function beginTaskEdit(task: Task) {
+    setEditingTaskId(task.id);
+    setEditingTaskTitle(task.title);
+    setEditingTaskDueDate(task.due_date || "");
+    setEditingTaskPriority(task.priority as "low" | "medium" | "high");
+    setTaskMessage("");
+  }
+
+  async function saveTaskEdit(taskId: string) {
+    if (!editingTaskTitle.trim()) return;
+    const patch = { title: editingTaskTitle.trim(), due_date: editingTaskDueDate || null, priority: editingTaskPriority };
+    const { error } = await createClient().from("tasks").update(patch).eq("id", taskId).eq("owner_id", props.userId);
+    if (!error) {
+      setTasks((items) => items.map((task) => task.id === taskId ? { ...task, ...patch } : task));
+      setEditingTaskId("");
+    }
+    setTaskMessage(error ? "Не удалось сохранить задачу." : "Задача обновлена.");
+  }
+
+  async function removeTask(task: Task) {
+    if (!window.confirm(`Удалить задачу «${task.title}»?`)) return;
+    const { error } = await createClient().from("tasks").delete().eq("id", task.id).eq("owner_id", props.userId);
+    if (!error) setTasks((items) => items.filter((item) => item.id !== task.id));
+    setTaskMessage(error ? "Не удалось удалить задачу." : "Задача удалена.");
   }
 
   async function signOut() {
@@ -605,31 +658,44 @@ export default function Dashboard(props: {
                 <article key={item.userId}><b>{item.name}</b><span>{item.days === 0 ? "День рождения сегодня" : item.days === 1 ? "День рождения завтра" : `Через ${item.days} дн.`}</span><time>{item.date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</time></article>
               )) : <p>В ближайшие 30 дней дней рождения нет.</p>}
             </section>}
-            {!!personalNotifications.length && <section className="personal-notifications">
+            <section className="personal-notifications">
               <div><span>🔔</span><div><strong>Личные уведомления</strong><small>Только ваши задачи и сроки</small></div></div>
               {personalNotifications.map(({ task, days }) => <article key={task.id}>
-                <b>{task.title}</b>
+                <div><b>{task.title}</b><small>{task.priority === "high" ? "Высокий приоритет" : task.priority === "low" ? "Низкий приоритет" : "Средний приоритет"}</small></div>
                 <span className={days < 0 ? "overdue" : ""}>{days < 0 ? `Просрочено на ${Math.abs(days)} дн.` : days === 0 ? "Срок сегодня" : days === 1 ? "Срок завтра" : `Осталось ${days} дн.`}</span>
               </article>)}
-            </section>}
+              {!personalNotifications.length && <p>Срочных уведомлений нет — ближайшие три дня свободны от дедлайнов.</p>}
+            </section>
             <p className="eyebrow">МОЁ ПРОСТРАНСТВО</p>
             <h1>Добрый день{props.name ? `, ${props.name.split(" ")[0]}` : ""}!</h1>
             <p className="lead">Здесь только ваши задачи. Начните с первой.</p>
             <form className="quick-add" onSubmit={addTask}>
               <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Что нужно сделать?" />
               <label className="task-deadline"><span>Срок</span><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
+              <label className="task-priority"><span>Приоритет</span><select value={newTaskPriority} onChange={(event) => setNewTaskPriority(event.target.value as typeof newTaskPriority)}><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select></label>
               <button className="primary" disabled={busy}>＋ Добавить</button>
             </form>
-            <div className="list-heading"><h2>Мои задачи</h2><span>{ownTasks.length}</span></div>
+            <div className="list-heading"><h2>Мои задачи</h2><span>{filteredOwnTasks.length} из {ownTasks.length}</span></div>
+            <section className="task-filters" aria-label="Фильтры задач">
+              <label>Статус<select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as typeof taskStatusFilter)}><option value="all">Все</option><option value="active">В работе</option><option value="done">Выполненные</option></select></label>
+              <label>Срок<select value={taskDueFilter} onChange={(event) => setTaskDueFilter(event.target.value as typeof taskDueFilter)}><option value="all">Любой</option><option value="overdue">Просроченные</option><option value="today">Сегодня</option><option value="week">Ближайшие 7 дней</option><option value="no-date">Без срока</option></select></label>
+              <label>Приоритет<select value={taskPriorityFilter} onChange={(event) => setTaskPriorityFilter(event.target.value as typeof taskPriorityFilter)}><option value="all">Любой</option><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select></label>
+              {(taskStatusFilter !== "all" || taskDueFilter !== "all" || taskPriorityFilter !== "all") && <button onClick={() => { setTaskStatusFilter("all"); setTaskDueFilter("all"); setTaskPriorityFilter("all"); }}>Сбросить</button>}
+            </section>
+            {taskMessage && <div className={taskMessage.startsWith("Не удалось") ? "notice" : "notice success"}>{taskMessage}</div>}
             <div className="task-list">
-              {ownTasks.map((task) => (
+              {filteredOwnTasks.map((task) => (
                 <article className={task.status === "done" ? "task done" : "task"} key={task.id}>
                   <button className="check" onClick={() => toggle(task)}>{task.status === "done" ? "✓" : ""}</button>
-                  <strong>{task.title}</strong>
-                  <div className="task-meta"><span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>{task.due_date && <time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</time>}</div>
+                  {editingTaskId === task.id ? <div className="task-edit">
+                    <input value={editingTaskTitle} onChange={(event) => setEditingTaskTitle(event.target.value)} aria-label="Название задачи" />
+                    <select value={editingTaskPriority} onChange={(event) => setEditingTaskPriority(event.target.value as typeof editingTaskPriority)} aria-label="Приоритет задачи"><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select>
+                    <input type="date" value={editingTaskDueDate} onChange={(event) => setEditingTaskDueDate(event.target.value)} aria-label="Срок задачи" />
+                    <div><button onClick={() => saveTaskEdit(task.id)}>Сохранить</button><button onClick={() => setEditingTaskId("")}>Отмена</button></div>
+                  </div> : <><strong>{task.title}</strong><div className="task-meta"><span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>{task.due_date && <time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</time>}<div className="task-actions"><button onClick={() => beginTaskEdit(task)} aria-label={`Редактировать ${task.title}`}>✎</button><button onClick={() => removeTask(task)} aria-label={`Удалить ${task.title}`}>×</button></div></div></>}
                 </article>
               ))}
-              {!ownTasks.length && <div className="empty"><b>Пока нет задач</b><p>Добавьте первую задачу — пространство создано специально для вас.</p></div>}
+              {!filteredOwnTasks.length && <div className="empty"><b>{ownTasks.length ? "По этим фильтрам задач нет" : "Пока нет задач"}</b><p>{ownTasks.length ? "Измените или сбросьте фильтры." : "Добавьте первую задачу — пространство создано специально для вас."}</p></div>}
             </div>
           </div>
         ) : tab === "stats" ? (
