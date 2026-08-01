@@ -70,6 +70,8 @@
   .org-canvas{margin-inline:-20px;padding:28px 20px;border-radius:0;border-left:0;border-right:0}.org-tree{justify-content:flex-start}.org-node{width:205px}.org-children{gap:18px}
 }
 
+.auth-switch{margin:18px 0 0;text-align:center;color:var(--muted);font-size:13px}.auth-switch button{border:0;background:transparent;padding:0;color:#6546bb;font-size:inherit;font-weight:750;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
 .quick-add{grid-template-columns:minmax(220px,1fr) 165px 145px auto}.task-priority{position:relative}.task-priority>span{position:absolute;z-index:1;top:7px;left:12px;color:#786d90;font-size:9px;font-weight:750}.task-priority select{width:100%;height:52px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:18px 10px 4px;font-size:13px}
 @media(max-width:760px){.quick-add{grid-template-columns:1fr}.task-priority select{width:100%}}
 
