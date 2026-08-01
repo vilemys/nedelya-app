@@ -167,3 +167,32 @@ body{background:linear-gradient(150deg,#fffaff 0%,#f8f4ff 48%,#f7fce9 100%);colo
 
 /* Упрощённый список должностей без дерева подчинённости */
 .structure-editor article{grid-template-columns:minmax(210px,.8fr) minmax(280px,1.5fr) auto}
+
+/* Единая типографика в ритме Speech2Text */
+:root{--text-xs:12px;--text-sm:13px;--text-md:15px;--text-lg:18px;--title-sm:24px;--title-lg:42px}
+body,button,input,select,textarea{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;letter-spacing:normal}
+body{font-size:var(--text-md);line-height:1.47}
+h1,h2,.content h1,.auth-story h1,.auth-form h2,.onboarding-card h1{letter-spacing:-.025em}
+.content h1{font-size:clamp(36px,4vw,var(--title-lg));line-height:1.15}
+.content h2,.list-heading h2,.structure-editor>div h2,.positions-card h2,.notification-contact-card h2,.database-card h2{font-size:var(--title-sm);line-height:1.25}
+.lead,.sub{font-size:var(--text-md);line-height:1.5}
+.eyebrow,.kicker{font-size:var(--text-xs);line-height:1.3;letter-spacing:.12em}
+.primary,.template-button,.topbar nav button,.pending-list button,.responsibility-list button,.database-add-row,.database-file-link,.member-details button,.position-buttons button{font-size:var(--text-sm);line-height:1.2}
+.content label,.auth-form label,.onboarding-card label,.invite-form label,.responsibility-form label,.kpi-form label,.structure-editor label,.member-details label,.member-position{font-size:var(--text-sm);line-height:1.35}
+.content input,.content select,.content textarea,.auth-form input,.onboarding-card input{font-size:var(--text-md);line-height:1.4}
+.task>strong,.member-list strong,.team-stats strong,.responsibility-list strong,.pending-list strong,.personal-notifications article b{font-size:var(--text-md);line-height:1.4}
+.task>span,.task-meta time,.member-list small,.team-stats small,.responsibility-list p,.pending-list small,.birthday-notifications article,.birthday-notifications>p,.personal-notifications small,.personal-notifications article span,.database-card th,.database-card td,.database-card header small,.profile-dialog>small{font-size:var(--text-xs);line-height:1.45}
+.stat-summary small,.kpi-title small,.kpi-values span,.kpi-footer label,.form-error,.form-success,.positions-card p,.structure-editor>div p,.notification-contact-card p{font-size:var(--text-xs);line-height:1.45}
+.stat-summary strong{font-family:inherit;font-size:32px;line-height:1.1}
+.kpi-title strong{font-size:var(--text-lg)}.kpi-values b{font-size:28px}
+.topbar .brand{font-size:20px}.topbar .org-name small{font-size:var(--text-xs)}.topbar .org-name strong{font-size:var(--text-sm)}
+.topbar .profile strong,.profile-main strong{font-size:var(--text-sm)!important}.topbar .profile small,.profile-main small{font-size:var(--text-xs)!important}.topbar .profile>button:last-child{font-size:var(--text-xs)}
+.profile-dialog h2{font-size:28px}.color-picker>span,.avatar-message,.avatar-upload,.avatar-remove{font-size:var(--text-sm)}
+.auth-story h1{font-size:clamp(42px,5vw,58px);line-height:1.05}.auth-story p{font-size:var(--text-md)}.auth-story small,.legal{font-size:var(--text-xs)}
+.auth-form h2{font-size:34px}.auth-tabs button{font-size:var(--text-sm)}
+
+@media(max-width:760px){
+  .content h1{font-size:34px;line-height:1.15}.content h2,.list-heading h2,.structure-editor>div h2,.positions-card h2,.notification-contact-card h2,.database-card h2{font-size:21px}
+  .lead{font-size:14px}.topbar nav button{font-size:12px}.topbar .brand{font-size:18px}
+  .profile-dialog h2{font-size:26px}.auth-form h2{font-size:30px}
+}
