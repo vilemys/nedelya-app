@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AuthForm({ invite = "" }: { invite?: string }) {
-  const [mode, setMode] = useState<"login" | "signup">("signup");
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,10 +38,6 @@ export default function AuthForm({ invite = "" }: { invite?: string }) {
 
   return (
     <form className="auth-form" onSubmit={submit}>
-      <div className="auth-tabs">
-        <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setMessage(""); }}>Регистрация</button>
-        <button type="button" className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setMessage(""); }}>Войти</button>
-      </div>
       <p className="eyebrow">{invite ? "ПРИГЛАШЕНИЕ В КОМАНДУ" : mode === "signup" ? "НАЧНЁМ С НУЛЯ" : "С ВОЗВРАЩЕНИЕМ"}</p>
       <h2>{mode === "signup" ? "Создайте аккаунт" : "Войдите в Недельку"}</h2>
       <p className="sub">{invite ? "Войдите или создайте аккаунт с той почтой, на которую вас пригласили." : mode === "signup" ? "После регистрации вы создадите пустую организацию." : "Ваши задачи и команда уже ждут."}</p>
@@ -50,7 +46,7 @@ export default function AuthForm({ invite = "" }: { invite?: string }) {
       <label>Пароль<input required type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Минимум 8 символов" /></label>
       {message && <div className={message.startsWith("Проверьте") ? "notice success" : "notice"}>{message}</div>}
       <button className="primary" disabled={loading}>{loading ? "Подождите…" : mode === "signup" ? "Зарегистрироваться →" : "Войти →"}</button>
-      <small className="legal">Регистрируясь, вы соглашаетесь с условиями использования и политикой конфиденциальности.</small>
+      {mode === "login" ? <p className="auth-switch">Нет аккаунта? <button type="button" onClick={() => { setMode("signup"); setMessage(""); }}>Зарегистрируйтесь</button></p> : <><p className="auth-switch">Уже есть аккаунт? <button type="button" onClick={() => { setMode("login"); setMessage(""); }}>Войти</button></p><small className="legal">Регистрируясь, вы соглашаетесь с условиями использования и политикой конфиденциальности.</small></>}
     </form>
   );
 }
