@@ -369,15 +369,6 @@ export default function Dashboard(props: {
     }
   }
 
-  async function changePositionParent(positionId: string, parentPositionId: string) {
-    const { error } = await createClient().from("positions").update({
-      parent_position_id: parentPositionId || null,
-    }).eq("id", positionId);
-    if (!error) setPositions((items) => items.map((position) => position.id === positionId
-      ? { ...position, parent_position_id: parentPositionId || null }
-      : position));
-  }
-
   async function changePositionPurpose(positionId: string, purpose: string) {
     setPositions((items) => items.map((position) => position.id === positionId ? { ...position, purpose } : position));
   }
@@ -504,25 +495,6 @@ export default function Dashboard(props: {
   }
 
   const roleName = props.role === "owner" ? "Владелец" : props.role === "manager" ? "Руководитель" : "Сотрудник";
-  const rootPositions = positions.filter((position) => !position.parent_position_id || !positions.some((item) => item.id === position.parent_position_id));
-
-  function renderPositionNode(position: Position, path: string[] = []) {
-    if (path.includes(position.id)) return null;
-    const assigned = members.filter((member) => member.position_id === position.id);
-    const children = positions.filter((item) => item.parent_position_id === position.id);
-    return <div className="org-branch" key={position.id}>
-      <article className="org-node">
-        <div className="org-node-heading"><span>ДОЛЖНОСТЬ</span><b>{position.name}</b></div>
-        {position.purpose && <p>{position.purpose}</p>}
-        <div className="org-people">
-          {assigned.map((member) => <span key={member.user_id}><i>{memberName(member.user_id).slice(0, 1)}</i>{memberName(member.user_id)}</span>)}
-          {!assigned.length && <span className="vacancy">＋ Вакансия</span>}
-        </div>
-      </article>
-      {!!children.length && <div className="org-children">{children.map((child) => renderPositionNode(child, [...path, position.id]))}</div>}
-    </div>;
-  }
-
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -532,7 +504,7 @@ export default function Dashboard(props: {
           <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>✓ Мои задачи <b>{ownTasks.filter((task) => task.status !== "done").length}</b></button>
           <button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>▥ Статистика</button>
           <button className={tab === "duties" ? "active" : ""} onClick={() => setTab("duties")}>☷ Обязанности</button>
-          <button className={tab === "structure" ? "active" : ""} onClick={() => setTab("structure")}>⌘ Структура</button>
+          {canManage && <button className={tab === "structure" ? "active" : ""} onClick={() => setTab("structure")}>⌘ Структура</button>}
           <button className={tab === "kpi" ? "active" : ""} onClick={() => setTab("kpi")}>↗ KPI</button>
           <button className={tab === "database" ? "active" : ""} onClick={() => setTab("database")}>▦ Мои базы</button>
           {canManage && <button className={tab === "team" ? "active" : ""} onClick={() => setTab("team")}>◎ Команда <b>{members.length}</b></button>}
@@ -656,30 +628,21 @@ export default function Dashboard(props: {
               {!visibleResponsibilities.length && <div className="empty"><b>Обязанности ещё не добавлены</b><p>{canManage ? "Добавьте первую обязанность сотрудника." : "Руководитель пока не заполнил этот раздел."}</p></div>}
             </div>
           </div>
-        ) : tab === "structure" ? (
+        ) : tab === "structure" && canManage ? (
           <div className="content structure-content">
             <p className="eyebrow">КТО ЗА ЧТО ОТВЕЧАЕТ</p>
             <h1>Структура Организации</h1>
-            <p className="lead">Большое дерево компании: должности, подчинённость, цели и сотрудники на каждом месте.</p>
-            {canManage && <section className="structure-editor">
-              <div className="structure-editor-head"><div><h2>Настройка дерева</h2><p>Выберите для каждой должности руководящую должность и кратко опишите её главную цель.</p></div><button className="template-button" onClick={installStructureTemplate}>＋ Добавить готовую структуру</button></div>
+            <p className="lead">Список должностей компании и главный результат, за который отвечает каждая из них.</p>
+            <section className="structure-editor">
+              <div className="structure-editor-head"><div><h2>Должности и цели</h2><p>Укажите понятное название и кратко опишите главную цель каждой должности.</p></div><button className="template-button" onClick={installStructureTemplate}>＋ Добавить готовые должности</button></div>
               {positions.map((position) => <article key={position.id}>
                 <label>Название должности<input value={position.name} onChange={(event) => changePositionName(position.id, event.target.value)} /></label>
-                <label>Подчиняется<select value={position.parent_position_id || ""} onChange={(event) => changePositionParent(position.id, event.target.value)}>
-                  <option value="">Верхний уровень</option>
-                  {positions.filter((item) => item.id !== position.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select></label>
                 <label>Цель должности<input value={position.purpose} onChange={(event) => changePositionPurpose(position.id, event.target.value)} placeholder="Какой главный результат даёт эта должность?" /></label>
                 <div className="position-buttons"><button onClick={() => savePositionPurpose(position.id)}>Сохранить</button><button className="danger-button" onClick={() => removePosition(position.id)}>Удалить</button></div>
               </article>)}
+              {!positions.length && <div className="empty"><b>Должностей пока нет</b><p>Добавьте должности в разделе «Команда» или воспользуйтесь готовым набором.</p></div>}
               {positionMessage && <small className={positionMessage.startsWith("Не удалось") ? "form-error" : "form-success"}>{positionMessage}</small>}
-            </section>}
-            <div className="org-canvas">
-              <div className="org-tree">
-                {rootPositions.map((position) => renderPositionNode(position))}
-                {!positions.length && <div className="empty"><b>Дерево пока пустое</b><p>Руководитель может добавить должности в разделе «Команда».</p></div>}
-              </div>
-            </div>
+            </section>
           </div>
         ) : tab === "kpi" ? (
           <div className="content">
