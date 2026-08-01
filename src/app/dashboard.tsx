@@ -33,6 +33,7 @@ export default function Dashboard(props: {
   const [newPosition, setNewPosition] = useState("");
   const [positionMessage, setPositionMessage] = useState("");
   const [selectedPositionIds, setSelectedPositionIds] = useState<string[]>([]);
+  const [positionSelectionMode, setPositionSelectionMode] = useState(false);
   const [responsibilities, setResponsibilities] = useState(props.initialResponsibilities);
   const [responsibilityAssignee, setResponsibilityAssignee] = useState(props.members[0]?.user_id || "");
   const [responsibilityTitle, setResponsibilityTitle] = useState("");
@@ -65,7 +66,7 @@ export default function Dashboard(props: {
   const [recordLinks, setRecordLinks] = useState<Record<string, string>>({});
   const [recordFiles, setRecordFiles] = useState<Record<string, File | null>>({});
   const [databaseBusy, setDatabaseBusy] = useState("");
-  const [taskStatusFilter, setTaskStatusFilter] = useState<"all" | "active" | "done">("all");
+  const [taskStatusFilter, setTaskStatusFilter] = useState<"all" | "active" | "postponed" | "done">("all");
   const [taskDueFilter, setTaskDueFilter] = useState<"all" | "overdue" | "today" | "week" | "no-date">("all");
   const [taskPriorityFilter, setTaskPriorityFilter] = useState<"all" | "low" | "medium" | "high">("all");
   const [taskSortMode, setTaskSortMode] = useState<"priority" | "date" | "manual">("priority");
@@ -75,8 +76,10 @@ export default function Dashboard(props: {
   const [editingTaskDescription, setEditingTaskDescription] = useState("");
   const [editingTaskDueDate, setEditingTaskDueDate] = useState("");
   const [editingTaskPriority, setEditingTaskPriority] = useState<"low" | "medium" | "high">("medium");
+  const [editingTaskStatus, setEditingTaskStatus] = useState<"planned" | "postponed" | "done">("planned");
   const [taskMessage, setTaskMessage] = useState("");
   const [openTaskId, setOpenTaskId] = useState("");
+  const [newTaskDetailsOpen, setNewTaskDetailsOpen] = useState(false);
   const ownTasks = useMemo(() => tasks.filter((task) => task.owner_id === props.userId), [tasks, props.userId]);
   const canManage = props.role === "owner" || props.role === "manager";
   const visibleResponsibilities = canManage
@@ -164,7 +167,8 @@ export default function Dashboard(props: {
     const weekEnd = new Date(today);
     weekEnd.setDate(weekEnd.getDate() + 7);
     const filtered = ownTasks.filter((task) => {
-      if (taskStatusFilter === "active" && task.status === "done") return false;
+      if (taskStatusFilter === "active" && task.status !== "planned") return false;
+      if (taskStatusFilter === "postponed" && task.status !== "postponed") return false;
       if (taskStatusFilter === "done" && task.status !== "done") return false;
       if (taskPriorityFilter !== "all" && task.priority !== taskPriorityFilter) return false;
       if (taskDueFilter === "no-date") return !task.due_date;
@@ -196,7 +200,7 @@ export default function Dashboard(props: {
   function taskStats(userId: string) {
     const items = tasks.filter((task) => task.owner_id === userId);
     const done = items.filter((task) => task.status === "done").length;
-    const active = items.length - done;
+    const active = items.filter((task) => task.status === "planned").length;
     const overdue = items.filter((task) => task.status !== "done" && task.due_date && new Date(`${task.due_date}T23:59:59`) < new Date()).length;
     return { total: items.length, done, active, overdue, percent: items.length ? Math.round(done / items.length * 100) : 0 };
   }
@@ -234,12 +238,13 @@ export default function Dashboard(props: {
     setEditingTaskDescription(task.description || "");
     setEditingTaskDueDate(task.due_date || "");
     setEditingTaskPriority(task.priority as "low" | "medium" | "high");
+    setEditingTaskStatus(task.status as "planned" | "postponed" | "done");
     setTaskMessage("");
   }
 
   async function saveTaskEdit(taskId: string) {
     if (!editingTaskTitle.trim()) return;
-    const patch = { title: editingTaskTitle.trim(), description: editingTaskDescription.trim() || null, due_date: editingTaskDueDate || null, priority: editingTaskPriority };
+    const patch = { title: editingTaskTitle.trim(), description: editingTaskDescription.trim() || null, due_date: editingTaskDueDate || null, priority: editingTaskPriority, status: editingTaskStatus, completed_at: editingTaskStatus === "done" ? new Date().toISOString() : null };
     const { error } = await createClient().from("tasks").update(patch).eq("id", taskId).eq("owner_id", props.userId);
     if (!error) {
       setTasks((items) => items.map((task) => task.id === taskId ? { ...task, ...patch } : task));
@@ -739,12 +744,39 @@ export default function Dashboard(props: {
         </section>
       </div>}
 
+      {newTaskDetailsOpen && <div className="task-details-backdrop" onMouseDown={() => setNewTaskDetailsOpen(false)}>
+        <section className="task-details-dialog task-form-dialog" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Пояснение к новой задаче">
+          <button className="task-details-close" onClick={() => setNewTaskDetailsOpen(false)} aria-label="Закрыть пояснение">×</button>
+          <p className="eyebrow">НОВАЯ ЗАДАЧА</p>
+          <h2>Подробности задачи</h2>
+          <p className="task-dialog-lead">Добавьте контекст, ссылки, ожидаемый результат или важные условия.</p>
+          <textarea value={newTaskDescription} onChange={(event) => setNewTaskDescription(event.target.value)} placeholder="Например: что должно получиться, с кем согласовать и где лежат материалы" autoFocus />
+          <div className="task-dialog-actions"><button className="primary" onClick={() => setNewTaskDetailsOpen(false)}>Сохранить пояснение</button>{newTaskDescription && <button className="secondary" onClick={() => setNewTaskDescription("")}>Очистить</button>}</div>
+        </section>
+      </div>}
+
+      {editingTaskId && <div className="task-details-backdrop" onMouseDown={() => setEditingTaskId("")}>
+        <section className="task-details-dialog task-form-dialog" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Редактирование задачи">
+          <button className="task-details-close" onClick={() => setEditingTaskId("")} aria-label="Закрыть редактирование">×</button>
+          <p className="eyebrow">РЕДАКТИРОВАНИЕ</p>
+          <h2>Изменить задачу</h2>
+          <label>Название задачи<input value={editingTaskTitle} onChange={(event) => setEditingTaskTitle(event.target.value)} /></label>
+          <label>Подробности задачи<textarea value={editingTaskDescription} onChange={(event) => setEditingTaskDescription(event.target.value)} placeholder="Добавьте пояснение, ссылки или ожидаемый результат" /></label>
+          <div className="task-dialog-grid">
+            <label>Приоритет<select value={editingTaskPriority} onChange={(event) => setEditingTaskPriority(event.target.value as typeof editingTaskPriority)}><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select></label>
+            <label>Статус<select value={editingTaskStatus} onChange={(event) => setEditingTaskStatus(event.target.value as typeof editingTaskStatus)}><option value="planned">В работе</option><option value="postponed">Отложена</option><option value="done">Выполнена</option></select></label>
+            <label>Срок<input type="date" value={editingTaskDueDate} onChange={(event) => setEditingTaskDueDate(event.target.value)} /></label>
+          </div>
+          <div className="task-dialog-actions"><button className="primary" onClick={() => saveTaskEdit(editingTaskId)}>Сохранить изменения</button><button className="secondary" onClick={() => setEditingTaskId("")}>Отмена</button></div>
+        </section>
+      </div>}
+
       {openTask && <div className="task-details-backdrop" onMouseDown={() => setOpenTaskId("")}>
         <section className="task-details-dialog" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Подробности задачи">
           <button className="task-details-close" onClick={() => setOpenTaskId("")} aria-label="Закрыть задачу">×</button>
           <p className="eyebrow">ПОДРОБНОСТИ ЗАДАЧИ</p>
           <h2>{openTask.title}</h2>
-          <div className="task-details-meta"><span>{openTask.priority === "high" ? "Высокий приоритет" : openTask.priority === "low" ? "Низкий приоритет" : "Средний приоритет"}</span><span>{openTask.status === "done" ? "Выполнена" : "В работе"}</span>{openTask.due_date && <time>Срок: {new Date(`${openTask.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</time>}</div>
+          <div className="task-details-meta"><span>{openTask.priority === "high" ? "Высокий приоритет" : openTask.priority === "low" ? "Низкий приоритет" : "Средний приоритет"}</span><span className={`status-${openTask.status}`}>{openTask.status === "done" ? "Выполнена" : openTask.status === "postponed" ? "Отложена" : "В работе"}</span>{openTask.due_date && <time>Срок: {new Date(`${openTask.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</time>}</div>
           <div className="task-details-description"><small>ПОЯСНЕНИЕ</small><p>{openTask.description || "Подробности пока не добавлены. Откройте редактирование и добавьте краткое пояснение."}</p></div>
           <button className="primary" onClick={() => { setOpenTaskId(""); beginTaskEdit(openTask); }}>Редактировать задачу</button>
         </section>
@@ -771,16 +803,15 @@ export default function Dashboard(props: {
             <h1>Добрый день{props.name ? `, ${props.name.split(" ")[0]}` : ""}!</h1>
             <p className="lead">Здесь только ваши задачи. Начните с первой.</p>
             <form className="quick-add" onSubmit={addTask}>
-              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Что нужно сделать?" />
+              <div className="task-title-field"><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Что нужно сделать?" /><button type="button" className={newTaskDescription ? "task-details-trigger filled" : "task-details-trigger"} onClick={() => setNewTaskDetailsOpen(true)}>{newTaskDescription ? "✓ Пояснение добавлено — изменить" : "＋ Добавить пояснение к задаче"}</button></div>
               <label className="task-deadline"><span>Срок</span><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></label>
               <label className="task-priority"><span>Приоритет</span><select value={newTaskPriority} onChange={(event) => setNewTaskPriority(event.target.value as typeof newTaskPriority)}><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select></label>
-              <button className="primary" disabled={busy}>＋ Добавить</button>
-              <textarea className="task-description-input" value={newTaskDescription} onChange={(event) => setNewTaskDescription(event.target.value)} placeholder="Краткое пояснение или подробности задачи (необязательно)" />
+              <div className="task-submit-row"><span>{newTaskDescription ? "Подробности задачи сохранены" : "Можно добавить подробности задачи"}</span><button className="primary" disabled={busy}>＋ Добавить задачу</button></div>
             </form>
             <div className="list-heading"><h2>Мои задачи</h2><span>{filteredOwnTasks.length} из {ownTasks.length}</span></div>
             <section className="task-filters" aria-label="Фильтры задач">
               <label>Порядок<select value={taskSortMode} onChange={(event) => setTaskSortMode(event.target.value as typeof taskSortMode)}><option value="priority">По приоритету</option><option value="date">По сроку</option><option value="manual">Вручную</option></select></label>
-              <label>Статус<select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as typeof taskStatusFilter)}><option value="all">Все</option><option value="active">В работе</option><option value="done">Выполненные</option></select></label>
+              <label>Статус<select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as typeof taskStatusFilter)}><option value="all">Все</option><option value="active">В работе</option><option value="postponed">Отложенные</option><option value="done">Выполненные</option></select></label>
               <label>Срок<select value={taskDueFilter} onChange={(event) => setTaskDueFilter(event.target.value as typeof taskDueFilter)}><option value="all">Любой</option><option value="overdue">Просроченные</option><option value="today">Сегодня</option><option value="week">Ближайшие 7 дней</option><option value="no-date">Без срока</option></select></label>
               <label>Приоритет<select value={taskPriorityFilter} onChange={(event) => setTaskPriorityFilter(event.target.value as typeof taskPriorityFilter)}><option value="all">Любой</option><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select></label>
               {(taskStatusFilter !== "all" || taskDueFilter !== "all" || taskPriorityFilter !== "all") && <button onClick={() => { setTaskStatusFilter("all"); setTaskDueFilter("all"); setTaskPriorityFilter("all"); }}>Сбросить</button>}
@@ -788,15 +819,9 @@ export default function Dashboard(props: {
             {taskMessage && <div className={taskMessage.startsWith("Не удалось") ? "notice" : "notice success"}>{taskMessage}</div>}
             <div className="task-list">
               {filteredOwnTasks.map((task) => (
-                <article className={`${task.status === "done" ? "task done" : "task"}${draggedTaskId === task.id ? " dragging" : ""}`} key={task.id} draggable={taskSortMode === "manual"} onDragStart={() => setDraggedTaskId(task.id)} onDragEnd={() => setDraggedTaskId("")} onDragOver={(event) => taskSortMode === "manual" && event.preventDefault()} onDrop={() => taskSortMode === "manual" && reorderTask(draggedTaskId, task.id)}>
+                <article className={`task ${task.status === "done" ? "done" : task.status === "postponed" ? "postponed" : ""}${draggedTaskId === task.id ? " dragging" : ""}`} key={task.id} draggable={taskSortMode === "manual"} onDragStart={() => setDraggedTaskId(task.id)} onDragEnd={() => setDraggedTaskId("")} onDragOver={(event) => taskSortMode === "manual" && event.preventDefault()} onDrop={() => taskSortMode === "manual" && reorderTask(draggedTaskId, task.id)}>
                   <button className="check" onClick={() => toggle(task)}>{task.status === "done" ? "✓" : ""}</button>
-                  {editingTaskId === task.id ? <div className="task-edit">
-                    <input value={editingTaskTitle} onChange={(event) => setEditingTaskTitle(event.target.value)} aria-label="Название задачи" />
-                    <textarea value={editingTaskDescription} onChange={(event) => setEditingTaskDescription(event.target.value)} aria-label="Пояснение к задаче" placeholder="Краткие подробности задачи" />
-                    <select value={editingTaskPriority} onChange={(event) => setEditingTaskPriority(event.target.value as typeof editingTaskPriority)} aria-label="Приоритет задачи"><option value="high">Высокий</option><option value="medium">Средний</option><option value="low">Низкий</option></select>
-                    <input type="date" value={editingTaskDueDate} onChange={(event) => setEditingTaskDueDate(event.target.value)} aria-label="Срок задачи" />
-                    <div><button onClick={() => saveTaskEdit(task.id)}>Сохранить</button><button onClick={() => setEditingTaskId("")}>Отмена</button></div>
-                  </div> : <><strong>{taskSortMode === "manual" && <span className="drag-handle" title="Перетащите задачу">⋮⋮</span>}<button className="task-title-button" onClick={() => setOpenTaskId(task.id)}>{task.title}</button>{task.description && <small className="task-has-description">есть пояснение</small>}</strong><div className="task-meta"><span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>{task.due_date && <time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</time>}<div className="task-actions">{taskSortMode === "manual" && <><button onClick={() => moveTask(task.id, -1)} aria-label={`Переместить выше ${task.title}`}>↑</button><button onClick={() => moveTask(task.id, 1)} aria-label={`Переместить ниже ${task.title}`}>↓</button></>}<button onClick={() => beginTaskEdit(task)} aria-label={`Редактировать ${task.title}`}>✎</button><button onClick={() => removeTask(task)} aria-label={`Удалить ${task.title}`}>×</button></div></div></>}
+                  <><strong>{taskSortMode === "manual" && <span className="drag-handle" title="Перетащите задачу">⋮⋮</span>}<button className="task-title-button" onClick={() => setOpenTaskId(task.id)}>{task.title}</button><small className="task-description-preview">{task.description || "Подробности задачи"}</small></strong><div className="task-meta"><span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>{task.status === "postponed" && <span className="task-status-postponed">Отложена</span>}{task.due_date && <time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</time>}<div className="task-actions">{taskSortMode === "manual" && <><button onClick={() => moveTask(task.id, -1)} aria-label={`Переместить выше ${task.title}`}>↑</button><button onClick={() => moveTask(task.id, 1)} aria-label={`Переместить ниже ${task.title}`}>↓</button></>}<button onClick={() => beginTaskEdit(task)} aria-label={`Редактировать ${task.title}`}>✎</button><button onClick={() => removeTask(task)} aria-label={`Удалить ${task.title}`}>×</button></div></div></>
                 </article>
               ))}
               {!filteredOwnTasks.length && <div className="empty"><b>{ownTasks.length ? "По этим фильтрам задач нет" : "Пока нет задач"}</b><p>{ownTasks.length ? "Измените или сбросьте фильтры." : "Добавьте первую задачу — пространство создано специально для вас."}</p></div>}
@@ -860,14 +885,14 @@ export default function Dashboard(props: {
             <h1>Структура Организации</h1>
             <p className="lead">Список должностей компании и главный результат, за который отвечает каждая из них.</p>
             <section className="structure-editor">
-              <div className="structure-editor-head"><div><h2>Должности и цели</h2><p>Укажите понятное название и кратко опишите главную цель каждой должности.</p></div><button className="template-button" onClick={installStructureTemplate}>＋ Добавить готовые должности</button></div>
-              {positions.map((position) => <article key={position.id}>
-                <label className="position-select"><input type="checkbox" checked={selectedPositionIds.includes(position.id)} onChange={(event) => setSelectedPositionIds((items) => event.target.checked ? [...items, position.id] : items.filter((id) => id !== position.id))} /><span>Выбрать</span></label>
+              <div className="structure-editor-head"><div><h2>Должности и цели</h2><p>Укажите понятное название и кратко опишите главную цель каждой должности.</p></div><div className="structure-head-actions"><button className={positionSelectionMode ? "selection-toggle active" : "selection-toggle"} onClick={() => { setPositionSelectionMode((value) => !value); if (positionSelectionMode) setSelectedPositionIds([]); }}>{positionSelectionMode ? "Готово" : "Выбрать"}</button><button className="template-button" onClick={installStructureTemplate}>＋ Добавить готовые должности</button></div></div>
+              {positions.map((position) => <article className={positionSelectionMode ? "selection-active" : ""} key={position.id}>
+                {positionSelectionMode && <label className="position-select"><input type="checkbox" checked={selectedPositionIds.includes(position.id)} onChange={(event) => setSelectedPositionIds((items) => event.target.checked ? [...items, position.id] : items.filter((id) => id !== position.id))} /><span>Выбрать</span></label>}
                 <label>Название должности<input value={position.name} onChange={(event) => changePositionName(position.id, event.target.value)} /></label>
                 <label>Цель должности<input value={position.purpose} onChange={(event) => changePositionPurpose(position.id, event.target.value)} placeholder="Какой главный результат даёт эта должность?" /></label>
               </article>)}
               {!positions.length && <div className="empty"><b>Должностей пока нет</b><p>Добавьте должности в разделе «Команда» или воспользуйтесь готовым набором.</p></div>}
-              {!!positions.length && <div className="structure-actions"><span>{selectedPositionIds.length ? `Выбрано: ${selectedPositionIds.length}` : "Выберите должности только если хотите удалить их"}</span><div><button className="save-all" onClick={saveAllPositions}>Сохранить все изменения</button><button className="delete-selected" disabled={!selectedPositionIds.length} onClick={removeSelectedPositions}>Удалить выбранные</button></div></div>}
+              {!!positions.length && <div className="structure-actions"><span>{positionSelectionMode ? selectedPositionIds.length ? `Выбрано: ${selectedPositionIds.length}` : "Нажмите на нужные должности" : "Изменения сохраняются одной кнопкой"}</span><div><button className="save-all" onClick={saveAllPositions}>Сохранить все изменения</button>{positionSelectionMode && <button className="delete-selected" disabled={!selectedPositionIds.length} onClick={removeSelectedPositions}>Удалить выбранные</button>}</div></div>}
               {positionMessage && <small className={positionMessage.startsWith("Не удалось") ? "form-error" : "form-success"}>{positionMessage}</small>}
             </section>
           </div>
