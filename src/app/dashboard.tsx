@@ -34,6 +34,8 @@ export default function Dashboard(props: {
   const [positionMessage, setPositionMessage] = useState("");
   const [selectedPositionIds, setSelectedPositionIds] = useState<string[]>([]);
   const [positionSelectionMode, setPositionSelectionMode] = useState(false);
+  const [editingPositionId, setEditingPositionId] = useState("");
+  const [positionsExpanded, setPositionsExpanded] = useState(false);
   const [responsibilities, setResponsibilities] = useState(props.initialResponsibilities);
   const [responsibilityAssignee, setResponsibilityAssignee] = useState(props.members[0]?.user_id || "");
   const [responsibilityTitle, setResponsibilityTitle] = useState("");
@@ -698,7 +700,7 @@ export default function Dashboard(props: {
         <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span>Неделька</span></div>
         <div className="org-name"><small>ОРГАНИЗАЦИЯ</small><strong>{props.organizationName}</strong></div>
         <nav>
-          <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>✓ Мои задачи <b>{ownTasks.filter((task) => task.status !== "done").length}</b></button>
+          <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>✓ Мои задачи <b title="Всего задач">{ownTasks.length}</b></button>
           <button className={tab === "stats" ? "active" : ""} onClick={() => setTab("stats")}>▥ Статистика</button>
           <button className={tab === "duties" ? "active" : ""} onClick={() => setTab("duties")}>☷ Обязанности</button>
           {canManage && <button className={tab === "structure" ? "active" : ""} onClick={() => setTab("structure")}>⌘ Структура</button>}
@@ -711,7 +713,7 @@ export default function Dashboard(props: {
           <Avatar profile={{ full_name: props.name, avatar_url: avatarUrl, avatar_color: avatarColor }} />
           <div><strong>{props.name || props.email}</strong><small>Профиль · {roleName}</small></div>
           </button>
-          <button onClick={signOut}>Выйти →</button>
+          <button onClick={signOut} aria-label="Выйти"><span className="signout-label">Выйти</span> <span aria-hidden="true">→</span></button>
         </div>
       </header>
 
@@ -785,13 +787,13 @@ export default function Dashboard(props: {
       <section className="workspace">
         {tab === "tasks" ? (
           <div className="content">
-            {isNotificationContact && <section className="birthday-notifications">
+            {isNotificationContact && <section className={`birthday-notifications ${birthdayNotifications.length ? "" : "notification-empty"}`}>
               <div><span className="notification-icon">✦</span><div><strong>Уведомления о сотрудниках</strong><small>Вы назначены ответственным лицом</small></div></div>
               {birthdayNotifications.length ? birthdayNotifications.map((item) => (
                 <article key={item.userId}><b>{item.name}</b><span>{item.days === 0 ? "День рождения сегодня" : item.days === 1 ? "День рождения завтра" : `Через ${item.days} дн.`}</span><time>{item.date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</time></article>
               )) : <p>В ближайшие 30 дней дней рождения нет.</p>}
             </section>}
-            <section className="personal-notifications">
+            <section className={`personal-notifications ${personalNotifications.length ? "" : "notification-empty"}`}>
               <div><span>🔔</span><div><strong>Личные уведомления</strong><small>Только ваши задачи и сроки</small></div></div>
               {personalNotifications.map(({ task, days }) => <article key={task.id}>
                 <div><b>{task.title}</b><small>{task.priority === "high" ? "Высокий приоритет" : task.priority === "low" ? "Низкий приоритет" : "Средний приоритет"}</small></div>
@@ -821,7 +823,7 @@ export default function Dashboard(props: {
               {filteredOwnTasks.map((task) => (
                 <article className={`task ${task.status === "done" ? "done" : task.status === "postponed" ? "postponed" : ""}${draggedTaskId === task.id ? " dragging" : ""}`} key={task.id} draggable={taskSortMode === "manual"} onDragStart={() => setDraggedTaskId(task.id)} onDragEnd={() => setDraggedTaskId("")} onDragOver={(event) => taskSortMode === "manual" && event.preventDefault()} onDrop={() => taskSortMode === "manual" && reorderTask(draggedTaskId, task.id)}>
                   <button className="check" onClick={() => toggle(task)}>{task.status === "done" ? "✓" : ""}</button>
-                  <><strong>{taskSortMode === "manual" && <span className="drag-handle" title="Перетащите задачу">⋮⋮</span>}<button className="task-title-button" onClick={() => setOpenTaskId(task.id)}>{task.title}</button><small className="task-description-preview">{task.description || "Подробности задачи"}</small></strong><div className="task-meta"><span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>{task.status === "postponed" && <span className="task-status-postponed">Отложена</span>}{task.due_date && <time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</time>}<div className="task-actions">{taskSortMode === "manual" && <><button onClick={() => moveTask(task.id, -1)} aria-label={`Переместить выше ${task.title}`}>↑</button><button onClick={() => moveTask(task.id, 1)} aria-label={`Переместить ниже ${task.title}`}>↓</button></>}<button onClick={() => beginTaskEdit(task)} aria-label={`Редактировать ${task.title}`}>✎</button><button onClick={() => removeTask(task)} aria-label={`Удалить ${task.title}`}>×</button></div></div></>
+                  <><strong>{taskSortMode === "manual" && <span className="drag-handle" title="Перетащите задачу">⋮⋮</span>}<button className="task-title-button" onClick={() => setOpenTaskId(task.id)}>{task.title}</button><small className={`task-description-preview ${task.description ? "" : "is-empty"}`}>{task.description || "Без описания"}</small></strong><div className="task-meta"><span>{task.priority === "high" ? "Высокий" : task.priority === "low" ? "Низкий" : "Средний"}</span>{task.status === "postponed" && <span className="task-status-postponed">Отложена</span>}{task.due_date && <time>{new Date(`${task.due_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</time>}<div className="task-actions">{taskSortMode === "manual" && <><button onClick={() => moveTask(task.id, -1)} aria-label={`Переместить выше ${task.title}`}>↑</button><button onClick={() => moveTask(task.id, 1)} aria-label={`Переместить ниже ${task.title}`}>↓</button></>}<button onClick={() => beginTaskEdit(task)} aria-label={`Редактировать ${task.title}`}>✎</button><button onClick={() => removeTask(task)} aria-label={`Удалить ${task.title}`}>×</button></div></div></>
                 </article>
               ))}
               {!filteredOwnTasks.length && <div className="empty"><b>{ownTasks.length ? "По этим фильтрам задач нет" : "Пока нет задач"}</b><p>{ownTasks.length ? "Измените или сбросьте фильтры." : "Добавьте первую задачу — пространство создано специально для вас."}</p></div>}
@@ -888,8 +890,7 @@ export default function Dashboard(props: {
               <div className="structure-editor-head"><div><h2>Должности и цели</h2><p>Укажите понятное название и кратко опишите главную цель каждой должности.</p></div><div className="structure-head-actions"><button className={positionSelectionMode ? "selection-toggle active" : "selection-toggle"} onClick={() => { setPositionSelectionMode((value) => !value); if (positionSelectionMode) setSelectedPositionIds([]); }}>{positionSelectionMode ? "Готово" : "Выбрать"}</button><button className="template-button" onClick={installStructureTemplate}>＋ Добавить готовые должности</button></div></div>
               {positions.map((position) => <article className={positionSelectionMode ? "selection-active" : ""} key={position.id}>
                 {positionSelectionMode && <label className="position-select"><input type="checkbox" checked={selectedPositionIds.includes(position.id)} onChange={(event) => setSelectedPositionIds((items) => event.target.checked ? [...items, position.id] : items.filter((id) => id !== position.id))} /><span>Выбрать</span></label>}
-                <label>Название должности<input value={position.name} onChange={(event) => changePositionName(position.id, event.target.value)} /></label>
-                <label>Цель должности<input value={position.purpose} onChange={(event) => changePositionPurpose(position.id, event.target.value)} placeholder="Какой главный результат даёт эта должность?" /></label>
+                {editingPositionId === position.id ? <div className="position-edit-fields"><label>Название должности<input value={position.name} onChange={(event) => changePositionName(position.id, event.target.value)} /></label><label>Цель должности<textarea value={position.purpose} onChange={(event) => changePositionPurpose(position.id, event.target.value)} placeholder="Какой главный результат даёт эта должность?" /></label><button type="button" onClick={() => setEditingPositionId("")}>Готово</button></div> : <div className="position-summary"><div><strong>{position.name}</strong><p>{position.purpose || "Цель должности пока не указана"}</p></div><button type="button" onClick={() => setEditingPositionId(position.id)}>Редактировать</button></div>}
               </article>)}
               {!positions.length && <div className="empty"><b>Должностей пока нет</b><p>Добавьте должности в разделе «Команда» или воспользуйтесь готовым набором.</p></div>}
               {!!positions.length && <div className="structure-actions"><span>{positionSelectionMode ? selectedPositionIds.length ? `Выбрано: ${selectedPositionIds.length}` : "Нажмите на нужные должности" : "Изменения сохраняются одной кнопкой"}</span><div><button className="save-all" onClick={saveAllPositions}>Сохранить все изменения</button>{positionSelectionMode && <button className="delete-selected" disabled={!selectedPositionIds.length} onClick={removeSelectedPositions}>Удалить выбранные</button>}</div></div>}
@@ -941,8 +942,8 @@ export default function Dashboard(props: {
                 return <section className={`database-card ${isOwnDatabase ? "" : "read-only"}`} key={database.id}>
                 <header><div><small>{isOwnDatabase ? "МОЯ БАЗА" : `БАЗА СОТРУДНИКА · ${databaseProfile?.full_name || databaseProfile?.email || memberName(database.owner_id)}`}</small><h2>{database.name}</h2></div>{isOwnDatabase && <button onClick={() => removePersonalDatabase(database)}>Удалить</button>}</header>
                 <div className="database-table-wrap"><table><thead><tr>{database.columns.map((column) => <th key={column}>{column}</th>)}<th>Ссылка</th><th>Файл</th></tr></thead>
-                  <tbody>{database.records.map((record, index) => <tr key={index}>{database.columns.map((column) => <td key={column}>{record[column] || "—"}</td>)}<td>{record._link ? <a href={record._link} target="_blank" rel="noreferrer">Открыть ↗</a> : "—"}</td><td>{record._file_path ? <button className="database-file-link" onClick={() => openPersonalFile(record._file_path)}>📎 {record._file_name || "Файл"}</button> : "—"}</td></tr>)}
-                    {isOwnDatabase && <tr className="database-new-row">{database.columns.map((column) => <td key={column}><input value={recordDrafts[database.id]?.[column] || ""} onChange={(event) => setRecordDrafts((items) => ({ ...items, [database.id]: { ...(items[database.id] || {}), [column]: event.target.value } }))} placeholder="Введите значение" /></td>)}<td><input type="url" value={recordLinks[database.id] || ""} onChange={(event) => setRecordLinks((items) => ({ ...items, [database.id]: event.target.value }))} placeholder="https://…" /></td><td><label className="database-file-picker"><input type="file" onChange={(event) => setRecordFiles((items) => ({ ...items, [database.id]: event.target.files?.[0] || null }))} />{recordFiles[database.id]?.name || "＋ Выбрать файл"}</label></td></tr>}
+                  <tbody>{database.records.map((record, index) => <tr key={index}>{database.columns.map((column) => <td data-label={column} key={column}>{record[column] || "—"}</td>)}<td data-label="Ссылка">{record._link ? <a href={record._link} target="_blank" rel="noreferrer">Открыть ↗</a> : "—"}</td><td data-label="Файл">{record._file_path ? <button className="database-file-link" onClick={() => openPersonalFile(record._file_path)}>📎 {record._file_name || "Файл"}</button> : "—"}</td></tr>)}
+                    {isOwnDatabase && <tr className="database-new-row">{database.columns.map((column) => <td data-label={column} key={column}><input value={recordDrafts[database.id]?.[column] || ""} onChange={(event) => setRecordDrafts((items) => ({ ...items, [database.id]: { ...(items[database.id] || {}), [column]: event.target.value } }))} placeholder="Введите значение" /></td>)}<td data-label="Ссылка"><input type="url" value={recordLinks[database.id] || ""} onChange={(event) => setRecordLinks((items) => ({ ...items, [database.id]: event.target.value }))} placeholder="https://…" /></td><td data-label="Файл"><label className="database-file-picker"><input type="file" onChange={(event) => setRecordFiles((items) => ({ ...items, [database.id]: event.target.files?.[0] || null }))} />{recordFiles[database.id]?.name || "＋ Выбрать файл"}</label></td></tr>}
                   </tbody></table></div>
                 {isOwnDatabase ? <button className="database-add-row" disabled={databaseBusy === database.id} onClick={() => addDatabaseRecord(database)}>{databaseBusy === database.id ? "Сохраняем…" : "＋ Добавить строку"}</button> : <p className="database-read-only-note">Только просмотр</p>}
               </section>})}
@@ -955,12 +956,12 @@ export default function Dashboard(props: {
             <h1>Команда</h1>
             <p className="lead">Приглашайте сотрудников и других руководителей по персональной ссылке.</p>
             <section className="positions-card">
-              <div><h2>Должности</h2><p>Создайте список должностей вашей команды.</p></div>
+              <div className="positions-card-head"><div><h2>Должности</h2><p>{positions.length ? `${positions.length} должностей — редактирование находится в разделе «Структура».` : "Создайте список должностей вашей команды."}</p></div>{!!positions.length && <button type="button" onClick={() => setPositionsExpanded((value) => !value)}>{positionsExpanded ? "Скрыть список" : "Показать список"}</button>}</div>
               <form onSubmit={addPosition}>
                 <input value={newPosition} onChange={(event) => setNewPosition(event.target.value)} placeholder="Например, дизайнер" />
                 <button className="primary">＋ Добавить</button>
               </form>
-              {!!positions.length && <div className="position-chips">{positions.map((position) => <span key={position.id}>{position.name}</span>)}</div>}
+              {!!positions.length && positionsExpanded && <div className="position-chips">{positions.map((position) => <span key={position.id}>{position.name}</span>)}</div>}
               {positionMessage && <small className={positionMessage.startsWith("Не удалось") || positionMessage.includes("уже") ? "form-error" : "form-success"}>{positionMessage}</small>}
             </section>
             <form className="invite-form" onSubmit={createInvitation}>

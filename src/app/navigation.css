@@ -72,6 +72,24 @@
 
 .auth-switch{margin:18px 0 0;text-align:center;color:var(--muted);font-size:13px}.auth-switch button{border:0;background:transparent;padding:0;color:#6546bb;font-size:inherit;font-weight:750;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 
+/* UX-аудит: компактность, читаемость и мобильная адаптация */
+.task-description-preview.is-empty{color:#aaa2b7;font-style:italic}
+.birthday-notifications.notification-empty,.personal-notifications.notification-empty{display:flex;align-items:center;gap:14px;margin-bottom:10px;padding:10px 12px;box-shadow:none}.notification-empty>div{flex:0 0 auto}.notification-empty>p{margin:0 0 0 auto;color:#81768f;font-size:11px}.notification-empty>div small{display:none}
+.positions-card-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.positions-card-head>button{border:1px solid #ded3f2;border-radius:9px;background:#fff;color:#6548b6;padding:9px 11px;font-size:12px;font-weight:750;cursor:pointer}
+.structure-editor article{display:block;padding:10px 12px}.structure-editor article.selection-active{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center}.position-summary{display:flex;align-items:center;justify-content:space-between;gap:18px}.position-summary strong,.position-summary p{display:block;margin:0}.position-summary strong{font-size:14px}.position-summary p{margin-top:4px;color:var(--muted);font-size:12px;line-height:1.4}.position-summary button,.position-edit-fields>button{flex:0 0 auto;border:0;border-radius:9px;background:#eee8fa;color:#6548b6;padding:9px 11px;font-size:11px;font-weight:750;cursor:pointer}.position-edit-fields{display:grid;grid-template-columns:minmax(190px,.7fr) minmax(280px,1.3fr) auto;gap:10px;align-items:end}.position-edit-fields label{font-size:11px}.position-edit-fields input,.position-edit-fields textarea{display:block;width:100%;margin-top:5px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:9px 10px;font-size:13px}.position-edit-fields input{height:42px}.position-edit-fields textarea{min-height:64px;resize:vertical}.structure-editor article.selection-active>.position-summary,.structure-editor article.selection-active>.position-edit-fields{grid-column:2/-1}
+.account-settings .primary{position:sticky;bottom:-1px;z-index:2;box-shadow:0 -8px 18px rgba(255,250,253,.95),0 8px 18px rgba(103,70,202,.18)}
+
+@media(max-width:760px){
+  .topbar{min-height:auto!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:7px!important;padding:8px 10px!important}.topbar .brand{min-width:0;font-size:17px!important;gap:7px}.topbar .brand-mark{flex:0 0 auto;width:34px!important;height:34px!important}.topbar .brand>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.topbar .profile{width:auto!important;min-width:0!important;grid-template-columns:34px auto!important;padding:4px!important}.profile-main,.profile-main .avatar{width:34px!important;height:34px!important;min-width:34px!important}.topbar .profile>button:last-child{width:34px!important;min-width:34px!important;height:34px!important;padding:0!important}.signout-label{display:none}
+  .topbar nav{grid-column:1/-1!important;grid-row:2!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;width:100%!important;gap:4px!important;overflow:visible!important;padding:0!important}.topbar nav button{min-width:0;height:34px!important;padding:2px 4px!important;overflow:hidden;font-size:10px!important;line-height:1.1;text-overflow:ellipsis;white-space:nowrap}.topbar nav b{margin-left:2px;padding:1px 4px}
+  .workspace{min-height:calc(100vh - 112px)}.content{padding-top:28px}.content h1{font-size:32px!important;line-height:1.12!important}
+  .birthday-notifications.notification-empty,.personal-notifications.notification-empty{align-items:flex-start;gap:8px;padding:9px 10px}.notification-empty>div>span{width:32px;height:32px}.notification-empty>div strong{font-size:12px}.notification-empty>p{align-self:center;font-size:10px;line-height:1.35}
+  .positions-card-head{align-items:flex-start}.positions-card-head>button{flex:0 0 auto;padding:8px}.position-chips{max-height:190px;overflow:auto;padding-right:3px}
+  .position-summary{align-items:flex-start}.position-summary>div{min-width:0}.position-summary strong{font-size:13px}.position-summary p{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2}.position-summary button{padding:8px;font-size:10px}.position-edit-fields{grid-template-columns:1fr}.position-edit-fields>button{width:100%}.structure-editor article.selection-active{grid-template-columns:30px minmax(0,1fr)}
+  .profile-dialog{max-height:94vh;padding:22px 18px}.profile-dialog h2{margin-bottom:15px}.avatar-preview{margin:4px 0 13px}.avatar-preview .avatar{width:74px;height:74px;border-radius:22px;font-size:25px}.color-picker{margin-top:15px}.account-settings{margin-top:18px;padding-top:17px}
+  .database-card{padding:15px}.database-card>header{align-items:flex-start}.database-card header button{padding:7px;border-radius:8px;background:#fff0ee}.database-table-wrap{overflow:visible}.database-card table,.database-card tbody,.database-card tr,.database-card td{display:block;width:100%;min-width:0}.database-card thead{display:none}.database-card tbody{display:grid;gap:10px}.database-card tr{overflow:hidden;border:1px solid #e8def5;border-radius:12px;background:#fff}.database-card td{display:grid;grid-template-columns:minmax(88px,.45fr) minmax(0,1fr);align-items:center;gap:9px;border:0;border-bottom:1px solid #f0e9f8;padding:9px 10px}.database-card td:last-child{border-bottom:0}.database-card td:before{content:attr(data-label);color:#7055b8;font-size:10px;font-weight:800}.database-new-row{border-style:dashed!important;background:#fbf9ff!important}.database-new-row input{min-width:0!important;padding:8px;border:1px solid #e5dcf1!important;border-radius:8px}.database-file-picker{min-width:0;max-width:100%}.database-file-link{max-width:100%}
+}
+
 .quick-add{grid-template-columns:minmax(220px,1fr) 165px 145px auto}.task-priority{position:relative}.task-priority>span{position:absolute;z-index:1;top:7px;left:12px;color:#786d90;font-size:9px;font-weight:750}.task-priority select{width:100%;height:52px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:18px 10px 4px;font-size:13px}
 @media(max-width:760px){.quick-add{grid-template-columns:1fr}.task-priority select{width:100%}}
 
@@ -276,4 +294,20 @@ h1,h2,.content h1,.auth-story h1,.auth-form h2,.onboarding-card h1{letter-spacin
 @media(max-width:760px){
   .structure-head-actions{display:grid;grid-template-columns:1fr}.structure-head-actions button{width:100%}.structure-editor article,.structure-editor article.selection-active{grid-template-columns:1fr}.structure-editor article.selection-active .position-select{justify-items:start}.structure-editor article>label:last-child{grid-column:auto}
   .quick-add{grid-template-columns:1fr;padding:13px}.task-submit-row{grid-column:auto;align-items:stretch;flex-direction:column}.task-submit-row .primary{width:100%;min-width:0}.task-dialog-grid{grid-template-columns:1fr}.task-dialog-actions{display:grid;grid-template-columns:1fr}.task-dialog-actions button{width:100%}.task-description-preview{max-width:100%}
+}
+
+/* Финальные мобильные правила после исторических переопределений */
+@media(max-width:760px){
+  .database-table-wrap{overflow:visible!important}
+  .database-card table{display:block!important;width:100%!important;min-width:0!important}
+  .database-card thead{display:none!important}
+  .database-card tbody{display:grid!important;width:100%!important;gap:10px}
+  .database-card tr{display:block!important;width:100%!important;min-width:0!important;padding:12px;border:1px solid #e7def4;border-radius:14px;background:#fff}
+  .database-card td{display:grid!important;grid-template-columns:88px minmax(0,1fr);align-items:start;width:100%!important;min-width:0!important;padding:7px 0!important;border:0!important;gap:10px;overflow-wrap:anywhere}
+  .database-card td::before{content:attr(data-label);color:#897b9f;font-size:11px;font-weight:750}
+  .database-card td[data-label=""]::before{display:none}
+  .database-card td[data-label=""]{display:flex!important;justify-content:flex-end}
+  .database-new-row input{min-width:0!important}
+  .profile-dialog{max-height:94vh!important;padding:22px 18px!important}
+  .avatar-preview .avatar{width:74px!important;height:74px!important;font-size:22px!important}
 }
